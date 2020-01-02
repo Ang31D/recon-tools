@@ -1,0 +1,81 @@
+#!/bin/bash
+# grepip - Grep IP
+# by AngelD
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Grep IP - Pull / Exclude IPv4 addresses"
+  echo "Usage: 'grepip (<file>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_invert_match=$(echo 'no')
+arg_only_ipv4_alike=$(echo 'no')
+arg_exclude_ip_alike=$(echo 'no')
+arg_extract_ip_alike=$(echo 'no')
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-v' == "${arg}" || '--invert-match' == "${arg}" ]]; then
+    arg_invert_match=$(echo 'yes')
+  elif [[ '-g' == "${arg}" || '--only-ipv4-alike' == "${arg}" ]]; then
+    arg_only_ipv4_alike=$(echo 'yes')
+    arg_invert_match=$(echo 'yes')
+  elif [[ '-e' == "${arg}" || '--exclude-ip-alike' == "${arg}" ]]; then
+    arg_exclude_ip_alike=$(echo 'yes')
+    arg_invert_match=$(echo 'yes')
+  elif [[ '-E' == "${arg}" || '--extract-ip' == "${arg}" ]]; then
+    arg_extract_ip_alike=$(echo 'yes')
+    arg_invert_match=$(echo 'yes')
+  fi
+done
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Grep IPv4 Address - Pull / Exclude IPv4 addresses"
+  echo "Usage: 'grepip (<file>) [options]'"
+  echo "(no-option)               (default) return line matching IPv4"
+  echo "  -h, --help              display this help and exit"
+  echo "  -v, --invert-match      exclude IPv4 address from result"
+  echo "    invert-match options"
+  echo "    -g, --only-ipv4-alike     only return IPv4-alike string"
+  echo "    -e, --exclude-ipv4-alike  exclude IPv4-alike from result"
+  echo "    -E, --extract-ipv4        extract IPv4-alike from string"
+  exit
+fi
+
+data=""
+if [[ -p /dev/stdin ]]; then
+  data=$(cat "/dev/stdin" | tr ',' '\n')
+elif [[ $# -gt 0 ]]; then
+  data=$(cat $1 | tr ',' '\n')
+fi
+
+regex_ipv4=$(echo "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
+regex_ipv4_alike=$(echo "[0-9]{1,3}(\.|-)[0-9]{1,3}(\.|-)[0-9]{1,3}(\.|-)[0-9]{1,3}")
+
+# only print the match (<ip address>)
+if [[ $arg_invert_match == 'yes' ]]; then
+  result=$(echo "$data" | grep -E -v "^${regex_ipv4}$")
+
+  if  [[ $arg_only_ipv4_alike == 'yes' ]]; then
+    result=$(echo "$result" | grep -E "${regex_ipv4_alike}")
+  elif  [[ $arg_exclude_ip_alike == 'yes' ]]; then
+    result=$(echo "$result" | grep -E -v "${regex_ipv4_alike}")
+  fi
+
+  if  [[ $arg_extract_ip_alike == 'yes' ]]; then
+    result=$(echo "$result" | grep -E -o "${regex_ipv4_alike}")
+  fi
+
+  # output result if not empty to prevent output blank line
+  if [[ "${#result}" -gt 0 ]]; then
+    echo "$result" | sort -u -V
+  fi
+else
+  echo "$data" | grep -E "^${regex_ipv4}$" | sort -u -V
+fi

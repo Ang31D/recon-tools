@@ -1,0 +1,159 @@
+#!/bin/bash
+# hostprobe - Host Probe
+# by AngelD
+
+# display short help
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Host Probe - A utility for quickly see if a dns/host exists."
+  echo "Usage: 'hostprobe (<dns> | -f <file>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_query_host=$(echo 'no')
+query_host=""
+arg_from_file=$(echo 'no')
+from_file=""
+arg_allow_ip=$(echo 'no')
+arg_include_false=$(echo 'no')
+arg_extract_metadata=$(echo 'no')
+arg_verbose=$(echo 'no')
+arg_extra_verbose=$(echo 'no')
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-q' == "${arg}" || '--query-host' == "${arg}" ]]; then
+    arg_query_host=$(echo 'yes')
+    query_host="${!validx}"
+  elif [[ '-f' == "${arg}" || '--from-file' == "${arg}" ]]; then
+    arg_from_file=$(echo 'yes')
+    from_file="${!validx}"
+  elif [[ '-A' == "${arg}" || '--allow-ip' == "${arg}" ]]; then
+    arg_allow_ip=$(echo 'yes')
+  elif [[ '-I' == "${arg}" || '--include-false' == "${arg}" ]]; then
+    arg_include_false=$(echo 'yes')
+  elif [[ '-E' == "${arg}" || '--extract-metadata' == "${arg}" ]]; then
+    arg_extract_metadata=$(echo 'yes')
+  elif [[ '-v' == "${arg}" || '--verbose' == "${arg}" ]]; then
+    arg_verbose=$(echo 'yes')
+  elif [[ '-vv' == "${arg}" || '--extra-verbose' == "${arg}" ]]; then
+    arg_extra_verbose=$(echo 'yes')
+    arg_verbose=$(echo 'yes')
+  fi
+done
+
+#---- validate options ----
+if [[ $arg_query_dns == 'yes' ]]; then
+  if [[ "$query_dns" != *.* ]]; then
+    echo "hostprobe: invalid dns -- '$query_dns'"
+    arg_show_help=$(echo 'yes')
+  fi
+fi
+if [[ $arg_from_file == 'yes' ]]; then
+  if [[ ! -f "$from_file" ]]; then
+    echo "hostprobe: file not found -- '$from_file'"
+    arg_show_help=$(echo 'yes')
+  fi
+fi
+
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Host Probe - A utility for quickly see if a host exists."
+  echo "Usage: 'hostprobe (<host> | -f <file>) [options]'"
+  echo '(no-option)                (default) probe host and domain'
+  echo '  -q, --query-host         host to query'
+  echo '  -f, --from-file <file>   file with host per line'
+  echo '  -A, --allow-ip           allow probing ip-address'
+  echo '  -I, --include-false      output non existing verbose output'
+  echo '  -E, --extract-metadata   extract dns/ip'
+  echo '  -v, --verbose            verbose output'
+  echo '  -vv                      extra verbose output'
+  exit
+fi
+
+# read list of dns
+if [ -p /dev/stdin ]; then
+  data=$(cat "/dev/stdin") # from std input (piped output)
+elif [[ $# -gt 0 ]]; then
+  if [[ $arg_from_file == 'yes' ]]; then
+    data=$(cat $from_file) # from file
+  elif [[ $arg_query_host == 'yes' ]]; then
+    data=$(echo $query_host) # from input
+  else
+    data=$(echo $1) # from input
+  fi
+fi
+
+for dns in $data; do
+  dns_is_ip=$(echo 'no')
+  dns_ip=$(echo $dns | grep -E "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
+  if [[ "${#dns_ip}" -gt 0 ]]; then
+    dns_is_ip=$(echo 'yes')
+  fi
+  if [[ $dns_is_ip == 'yes' && $arg_allow_ip == 'no' ]]; then
+    continue
+  fi
+
+  result=$(host "$dns")
+  result_len="${#result}"
+  nx_domain=$(echo "$result" | grep "(NXDOMAIN)$") # dns does not exist
+  meta_handled_by=$(echo "$result" | grep " mail is handled by ")
+  meta_alias_for=$(echo "$result" | grep " is an alias for ")
+  meta_ip_address=$(echo "$result" | grep " has address ")
+  meta_dn_ptr=$(echo "$result" | grep "domain name pointer") # dns is ip address
+  if [[ "${#nx_domain}" -gt 0 ]]; then
+    if [[ $arg_include_false == 'no' ]]; then
+      continue
+    fi
+    echo "# $dns"
+    out_verbose=$(echo "$result")
+    if [[ $arg_verbose == 'yes' ]]; then
+      out_verbose=$(echo "$out_verbose" | sed 's/^/#/g')
+    fi
+    if [[ $arg_extra_verbose == 'no' ]]; then
+      out_verbose=$(echo "$out_verbose" | head -n 1)
+    fi
+    if [[ $arg_verbose == 'yes' || $arg_extra_verbose == 'yes' ]]; then
+      echo "$out_verbose"
+    fi
+    continue
+  fi
+
+  if [[ $result_len -eq 0 ]]; then
+    echo "$dns"
+    if [[ $arg_verbose == 'yes' ]]; then
+      echo "#(<blank> - dns exist, no host)"
+    fi
+    continue
+  fi
+
+  echo "$dns"
+  if [[ $arg_extra_verbose == 'yes' ]]; then
+    echo "$result" | sed 's/^/#/g'
+  elif [[ $arg_verbose == 'yes' ]]; then
+    echo "$result" | sed 's/^/#/g' | head -n 1
+  fi
+  if [[ $arg_extract_metadata == 'yes' ]]; then
+    if [[ "${#meta_handled_by}" -gt 0 ]]; then
+      echo "$meta_handled_by" | sed 's/.* //g' | sed 's/\.$//g'
+    fi
+    if [[ "${#meta_alias_for}" -gt 0 ]]; then
+      echo "$meta_alias_for" | sed 's/.* //g' | sed 's/\.$//g'
+    fi
+    if [[ "${#meta_dn_ptr}" -gt 0 ]]; then
+      echo "$meta_dn_ptr" | sed 's/.* //g' | sed 's/\.$//g'
+    fi
+
+    if [[ "${#meta_ip_address}" -gt 0 && $arg_allow_ip == 'yes' ]]; then
+      echo "$meta_ip_address" | sed 's/.* //g' | sed 's/\.$//g'
+    fi
+
+    if [[ $arg_verbose == 'yes' ]]; then
+      echo "#extracted metadata"
+    fi
+  fi
+done
