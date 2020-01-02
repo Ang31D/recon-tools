@@ -19,6 +19,8 @@ All tools has a help section by using the '-h' argument.
 
 ```dnsgrep google.com```
 
+```cat <dns_list> | dnsgrep```
+
 ### grepip - Pull / Exclude IPv4 addresses
 ```Usage: 'grepip (<file>) [options] -h, --help'```
 * exclude ip addresses from a file
