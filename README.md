@@ -5,17 +5,21 @@ All tools has a help section by using the '-h' argument.
 
 ## example usage
 
-### crt.sh - A utility for quickly searching presorted DNS names.
+### crtsh - A utility for quickly searching presorted DNS names.
 ```Usage: 'crtsh (<domain> | -f <file> -h, --help)'```
 * fetch google subdomains containing 'api'
 
-crtsh %25api%25.google.com
+```crtsh %25api%25.google.com```
 
-### fetch subdomains
-dnsgrep google.com
+### dnsgrep - A utility for quickly searching presorted DNS names.
+```Usage: 'dnsgrep (<dns> | -f <file>) [options] -h, --help'```
+* fetch subdomains
+```dnsgrep google.com```
 
-### exclude ip addresses from a file
-grepip file -v
+### Grep IP - Pull / Exclude IPv4 addresses
+```Usage: 'grepip (<file>) [options] -h, --help'```
+* exclude ip addresses from a file
+```grepip <result_from_dnsgrep> -v```
 
 ### output alive (sub-)domains listed in the file
 cat file | hostprobe
