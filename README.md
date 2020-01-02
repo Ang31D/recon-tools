@@ -10,6 +10,7 @@ All tools has a help section by using the '-h' argument.
 * fetch google subdomains containing 'api'
 
 ```crtsh %25api%25.google.com```
+
 ```cat <dns_list> |crtsh```
 
 ### dnsgrep - A utility for quickly searching presorted DNS names.
