@@ -7,7 +7,7 @@ All tools has a help section by using the '-h' argument.
 ## fetch google subdomains containing 'api'
 crtsh %25api%25.google.com
 
-# fetch subdomains
+### fetch subdomains
 dnsgrep google.com
 
 # exclude ip addresses from a file
