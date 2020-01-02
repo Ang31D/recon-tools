@@ -6,7 +6,7 @@ All tools has a help section by using the '-h' argument.
 ## example usage
 
 ### crt.sh - A utility for quickly searching presorted DNS names.
-Usage: 'crtsh (<domain> | -f <file> -h, --help)'
+```Usage: 'crtsh (<domain> | -f <file> -h, --help)'```
 * fetch google subdomains containing 'api'
 
 crtsh %25api%25.google.com
