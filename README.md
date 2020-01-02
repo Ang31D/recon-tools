@@ -41,4 +41,6 @@ All tools has a help section by using the '-h' argument.
 ```Usage: 'rdns (<file> | -r <dns>) -h, --help'```
 * Reverse each sub-name (ex. com.google)
 
-```echo google.com | rdns```
+```rdns google.com```
+
+```cat <dns_list> | rdns```
