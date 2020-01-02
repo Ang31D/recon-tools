@@ -1,6 +1,8 @@
 # recon-tools
 Tools for Recon
 
+All tools has a help section by using the '-h' argument.
+
 ---- example ----
 # fetch google subdomains containing 'api'
 crtsh %25api%25.google.com
