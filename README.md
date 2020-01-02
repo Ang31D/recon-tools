@@ -33,6 +33,8 @@ All tools has a help section by using the '-h' argument.
 ```Usage: 'hostprobe (<dns> | -f <file>) [options] -h, --help'```
 * output alive (sub-)domains listed in the file
 
+```hostprobe www.sites.google.com```
+
 ```cat <dns_file> | hostprobe```
 
 ### rdns - Reverse of each sub-name (ex. com.google).
