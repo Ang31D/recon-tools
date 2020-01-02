@@ -11,7 +11,7 @@ All tools has a help section by using the '-h' argument.
 
 ```crtsh %25api%25.google.com```
 
-```cat <dns_list> |crtsh```
+```cat <dns_list> | crtsh```
 
 ### dnsgrep - A utility for quickly searching presorted DNS names.
 ```Usage: 'dnsgrep (<dns> | -f <file>) [options] -h, --help'```
