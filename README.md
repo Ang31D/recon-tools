@@ -8,6 +8,7 @@ All tools has a help section by using the '-h' argument.
 ### crt.sh - A utility for quickly searching presorted DNS names.
 Usage: 'crtsh (<domain> | -f <file> -h, --help)'
 * fetch google subdomains containing 'api'
+
 crtsh %25api%25.google.com
 
 ### fetch subdomains
