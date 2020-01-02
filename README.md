@@ -23,7 +23,7 @@ All tools has a help section by using the '-h' argument.
 
 ```grepip <result_from_dnsgrep> -v```
 
-### Host Probe - A utility for quickly see if a dns/host exists.
+### hostprobe - A utility for quickly see if a dns/host exists.
 ```Usage: 'hostprobe (<dns> | -f <file>) [options] -h, --help'```
 * output alive (sub-)domains listed in the file
 
