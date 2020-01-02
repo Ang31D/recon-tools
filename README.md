@@ -11,10 +11,10 @@ crtsh %25api%25.google.com
 dnsgrep google.com
 
 # exclude ip addresses from a file
-grepip <file> -v
+grepip file -v
 
 # output alive (sub-)domains listed in the file
-cat <file> | hostprobe
+cat file | hostprobe
 
 # Reverse of each sub-name (ex. com.google)
 echo google.com | rdns
