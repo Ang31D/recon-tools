@@ -13,18 +13,24 @@ All tools has a help section by using the '-h' argument.
 
 ### dnsgrep - A utility for quickly searching presorted DNS names.
 ```Usage: 'dnsgrep (<dns> | -f <file>) [options] -h, --help'```
-* fetch subdomains
+* fetch google subdomains
 
 ```dnsgrep google.com```
 
-### Grep IP - Pull / Exclude IPv4 addresses
+### grepip - Pull / Exclude IPv4 addresses
 ```Usage: 'grepip (<file>) [options] -h, --help'```
 * exclude ip addresses from a file
 
 ```grepip <result_from_dnsgrep> -v```
 
-### output alive (sub-)domains listed in the file
-cat file | hostprobe
+### Host Probe - A utility for quickly see if a dns/host exists.
+```Usage: 'hostprobe (<dns> | -f <file>) [options] -h, --help'```
+* output alive (sub-)domains listed in the file
 
-### Reverse of each sub-name (ex. com.google)
-echo google.com | rdns
+```cat <dns_file> | hostprobe```
+
+### rdns - Reverse of each sub-name (ex. com.google).
+```Usage: 'rdns (<file> | -r <dns>) -h, --help'```
+* Reverse each sub-name (ex. com.google)
+
+```echo google.com | rdns```
