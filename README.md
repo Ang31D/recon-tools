@@ -14,11 +14,13 @@ All tools has a help section by using the '-h' argument.
 ### dnsgrep - A utility for quickly searching presorted DNS names.
 ```Usage: 'dnsgrep (<dns> | -f <file>) [options] -h, --help'```
 * fetch subdomains
+
 ```dnsgrep google.com```
 
 ### Grep IP - Pull / Exclude IPv4 addresses
 ```Usage: 'grepip (<file>) [options] -h, --help'```
 * exclude ip addresses from a file
+
 ```grepip <result_from_dnsgrep> -v```
 
 ### output alive (sub-)domains listed in the file
