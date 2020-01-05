@@ -19,10 +19,9 @@ arg_from_file=$(echo 'no')
 from_file=""
 arg_pretty_json=$(echo 'no')
 arg_raw=$(echo 'no')
-arg_list=$(echo 'yes')
-arg_all=$(echo 'no')
-arg_include_ip=$(echo 'no')
 arg_filter=$(echo 'yes')
+arg_include_ip=$(echo 'no')
+arg_only_ip=$(echo 'no')
 argidx=0 # arg index
 for arg in $@; do
 argidx=$((argidx+1)) # index of arg
@@ -39,14 +38,12 @@ validx=$((argidx+1)) # index of arg-value (next arg)
     arg_pretty_json=$(echo 'yes')
   elif [[ '-r' == "${arg}" || '--raw' == "${arg}" ]]; then
     arg_raw=$(echo 'yes')
-  elif [[ '-L' == "${arg}" || '--no-list' == "${arg}" ]]; then
-    arg_list=$(echo 'no')
-  elif [[ '-a' == "${arg}" || '--all' == "${arg}" ]]; then
-    arg_all=$(echo 'yes')
-  elif [[ '-I' == "${arg}" || '--include-ip' == "${arg}" ]]; then
-    arg_include_ip=$(echo 'yes')
   elif [[ '-F' == "${arg}" || '--no-filter' == "${arg}" ]]; then
-     arg_filter=$(echo 'no')
+    arg_filter=$(echo 'no')
+  elif [[ '-i' == "${arg}" || '--include-ip' == "${arg}" ]]; then
+    arg_include_ip=$(echo 'yes')
+  elif [[ '-I' == "${arg}" || '--only-ip' == "${arg}" ]]; then
+    arg_only_ip=$(echo 'yes')
  fi
 done
 
@@ -63,20 +60,24 @@ if [[ $arg_from_file == 'yes' ]]; then
     arg_show_help=$(echo 'yes')
   fi
 fi
+if [[ ! -p /dev/stdin ]] && [[ $arg_from_file == "no" && "$1" == "-"* ]]; then
+  echo "dnsgrep: invalid option -- '$1'"
+  arg_show_help=$(echo 'yes')
+fi
 
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
   echo "DNS Grep - A utility for quickly searching presorted DNS names."
-  echo "Usage: 'dnsgrep (<dns> | -f <file>) [options]'"
-  echo '(no-option)               (default) filter on domain, split on ","'
+  echo "Usage: 'dnsgrep (<dns> | -f <file>) [-p|-r] [-F, -i|-I] [options]'"
+  echo '(no-option)               (default) list (split on ","), filter on domain'
   echo '  -h, --help              display this help and exit'
   echo '  -q, --query-dns <dns>   dns to query'
   echo '  -f, --from-file <file>  file with dns per line'
   echo '  -p, --pretty-json       output as pretty-json'
-  echo '  -r, --raw               output as raw-json'
-  echo '  -L, --no-list           do not output as list (split on ",")'
-  echo '  -I, --include-ip        include ip address in output, not supported with -L'
+  echo '  -r, --raw               do not output as list (no split on ",")'
   echo '  -F, --no-filter         output does not filter on domain match'
+  echo '  -i, --include-ip        include ip address in output, supported with -L (default: no)'
+  echo '  -I, --only-ip           only output ip addresses, supported with -L (default: no)'
   exit
 fi
 
@@ -94,35 +95,38 @@ elif [[ $# -gt 0 ]]; then
 fi
 
 for dns in $data; do
-#result=$(curl -s https://dns.bufferover.run/dns?q=$1)
-
 dns_is_ip=$(echo "$dns" | grep -E "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
 if [[ "${#dns_is_ip}" -gt 0 ]]; then # is IP Address, only dns is allowed
   continue
 fi
 result=$(curl -s https://dns.bufferover.run/dns?q=$dns)
 
+
 if [[ $arg_pretty_json == 'yes' ]]; then
   echo "$result" | jq -r
-elif [[ $arg_raw == 'yes' ]]; then
-  echo $result
+  exit
+fi
+
+result=$(echo "$result" | jq -r '.? | .FDNS_A[],.RDNS[]')
+if [[ $arg_raw == 'yes' ]]; then
+  echo "$result"
+  exit
+fi
+result=$(echo "$result" | tr ',' '\n' | sort -u -V)
+
+output=$(echo "$result")
+if [[ $arg_filter == 'yes' ]]; then
+  output=$(echo "$output" | grep -E "^${dns}$|\.${dns}$")
 else
-  output=$(echo "$result" | jq -r '.? | .FDNS_A[],.RDNS[]')
-
-  if [[ $arg_filter == 'yes' ]]; then
-    output=$(echo "$output" | grep -E ",${dns}$|\.${dns}$")
+  if [[ $arg_include_ip == 'no' ]]; then
+    output=$(echo "$output" | grep -Ev "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" | sort -u -V)
   fi
-
-  if [[ $arg_list == 'yes' ]]; then
-    output=$(echo "$output" | tr ',' '\n' | sort -u -V)
-    if [[ $arg_include_ip == 'no' ]]; then
-      output=$(echo "$output" | grep -Ev "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" | sort -u -V)
-    fi
-  fi
-
-  if [[ "${#output}" -gt 0 ]]; then
-    echo "$output"
+  if [[ $arg_only_ip == 'yes' ]]; then
+    output=$(echo "$result" | grep -E "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" | sort -u -V)
   fi
 fi
 
+if [[ "${#output}" -gt 0 ]]; then
+  echo "$output"
+fi
 done
