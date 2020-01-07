@@ -62,13 +62,14 @@ if [[ $arg_filter == 'yes' ]]; then
     arg_show_help=$(echo 'yes')
 #  elif [[ "$filter_on_base_url" != "http"* && $arg_filter_on_number == "no" ]]; then
   elif [[ "$arg_filter_on_number" == "no" ]] && [[ "$filter_on_base_url" != "http://"* && "$filter_on_base_url" != "https://"* ]]; then
-    echo "gurl: invalid base url -- '$filter_on_base_url'"
+    echo "gurl: invalid base-url -- '$filter_on_base_url'"
     arg_show_help=$(echo 'yes')
   fi
 fi
 
 # display full help
-if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+#if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+if [[ $arg_show_help == 'yes' ]]; then
   echo "Grep Url - Parse url"
   echo "Usage: 'gurl [<file>] [-u|-p|-H]'"
   echo "  -p, --parse-uri-path        (default) output uri '</path>' (exclude 'http(s)://<host-dns>')"
@@ -77,7 +78,7 @@ if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
   echo "  -s, --show-stats            show number of occurrence (supported by -u|-d) and sequence"
   echo "  -f, --filter [<base-url>]   filter on base-url (see 'filter options')"
   echo "    filter options"
-  echo "    -n, --stats-number <number>   number from the '-u -s' output"
+  echo "    -n, --stats-number <number>   filter on (base-url) number from the '-u -s' output"
   exit
 fi
 
@@ -92,7 +93,9 @@ if [[ $arg_filter == 'yes' ]]; then
   output=$(echo "$data" | grep -Eo "^(http|https)://[a-zA-Z0-9._-]+" | sort | uniq -c | sort -nr | nl -w1)
   if [[ $arg_filter_on_number == 'yes' ]]; then
     base_url=$(echo "$output" | grep -Eo "^$filter_on_number\t.*" | grep -Eo "http(s){0,1}.*")
-    echo "$data" | grep -E "^$base_url"
+#    echo "$data" | grep -E "^$base_url"
+    echo "$data" | grep -E "^$base_url" | sort -u -V
+#    echo "$data" | grep -E "^$base_url" | sort | uniq -c | sort -nr | nl -w1
   else
     echo "$data" | grep -E "^$filter_on_base_url"
   fi
@@ -106,7 +109,7 @@ elif [[ $arg_parse_base_url == 'yes' ]]; then
   if [[ $arg_show_stats == 'yes' ]]; then
     echo "$data" | grep -Eo "^(http|https)://[a-zA-Z0-9._-]+" | sort | uniq -c | sort -nr | nl -w1
   else
-    echo "$data" | grep -Eo "^(http|https)://[a-zA-Z0-9._-]+" | sort -u -V
+    echo "$data" | grep -Eo "^(http|https)://[a-zA-Z0-9._-]+" | rev | sort -u -V -r | rev
   fi
 elif [[ $arg_parse_uri_path == 'yes' ]]; then
   echo "$data" | cut -d/ -f4- | sed 's/^/\//g' | sort -u -V
