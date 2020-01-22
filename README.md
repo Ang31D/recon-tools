@@ -52,3 +52,11 @@ All tools has a help section by using the '-h' argument.
 ```rhead2json https://www.google.com```
 
 ```curl -s -IXGET https://www.google.com | tee response.raw | rhead2json | tee response.headers.json```
+
+### urigrep - A utility for quickly return uri/url links.
+```Usage: 'urigrep (<url>) -h, --help'```
+* Fetch uri/urls from https://www.google.com
+
+```urigrep https://www.google.com```
+
+```curl -s https://www.google.com | urigrep```
