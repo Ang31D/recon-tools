@@ -44,3 +44,11 @@ All tools has a help section by using the '-h' argument.
 ```rdns google.com```
 
 ```cat <dns_list> | rdns```
+
+### rhead2json - A utility to convert HTTP response header to json format.
+```Usage: 'rdns (<file> | <url>) -h, --help'```
+* ex. https://www.google.com
+
+```rhead2json https://www.google.com```
+```rhead2json https://www.google.com | jq -r```
+```curl -s -IXGET https://www.google.com | rhead2json | jq -r '."set-cookie"'```
