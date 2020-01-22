@@ -50,5 +50,7 @@ All tools has a help section by using the '-h' argument.
 * ex. https://www.google.com
 
 ```rhead2json https://www.google.com```
+
 ```rhead2json https://www.google.com | jq -r```
+
 ```curl -s -IXGET https://www.google.com | rhead2json | jq -r '."set-cookie"'```
