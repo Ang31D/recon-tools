@@ -46,11 +46,9 @@ All tools has a help section by using the '-h' argument.
 ```cat <dns_list> | rdns```
 
 ### rhead2json - A utility to convert HTTP response header to json format.
-```Usage: 'rhead2json (<file>, <url>) -h, --help'```
+```Usage: 'rhead2json (<url>) -h, --help'```
 * Fetch headers from https://www.google.com as json-format
 
 ```rhead2json https://www.google.com```
-
-```rhead2json response.headers | jq -r```
 
 ```curl -s -IXGET https://www.google.com | tee response.headers | rhead2json | jq```
