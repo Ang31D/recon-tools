@@ -51,4 +51,4 @@ All tools has a help section by using the '-h' argument.
 
 ```rhead2json https://www.google.com```
 
-```curl -s -IXGET https://www.google.com | tee response.raw | rhead2json | tee response.headers.json | jq```
+```curl -s -IXGET https://www.google.com | tee response.raw | rhead2json | tee response.headers.json```
