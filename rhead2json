@@ -1,17 +1,12 @@
 #!/bin/bash
 # HTTP Response header to JSON - A utility to convert HTTP response header to json format.
+# by AngelD
 
 # display help banner
 if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
   echo "HTTP Response header to JSON - A utility to convert headers in json format."
-#  echo "Usage: 'rhead2json (<file>, <url>, <stdin>) -h, --help'"
   echo "Usage: 'rhead2json (<url>) -h, --help'"
   exit
-fi
-
-if [[ ! -p /dev/stdin && "$#" -eq 0 ]]; then
-  echo "missing input (stdin or file)"
-  exit 1
 fi
 
 arg_show_help=$(echo 'no')
@@ -30,8 +25,8 @@ if [[ $# -gt 0 ]]; then
   if [[ $# -ne 1 ]]; then
     echo "rhead2json: invalid options -- '$@'"
     arg_show_help=$(echo 'yes')
-  elif [[ "$1" != "http"* && ! -f "$1" ]]; then
-    echo "rhead2json: file not found -- '$1'"
+  elif [[ "$1" != "http"* ]]; then
+    echo "rhead2json: invalid url -- '$1'"
     arg_show_help=$(echo 'yes')
   fi
 fi
@@ -40,28 +35,21 @@ fi
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
   echo "HTTP Response header to JSON - A utility to convert headers in json format."
-#  echo "Usage: 'rhead2json (<file>, <url>, <stdin>)'"
   echo "Usage: 'rhead2json (<url>)'"
   exit
 fi
 
 if [[ "$#" -eq 1 ]]; then
-  if [[ "$1" == "http"* ]]; then
-    data=$(curl -s -IXGET "$1")
-  else
-    data=$(cat "$1")
-  fi
+  data=$(curl -s -IXGET "$1")
 elif [[ -p /dev/stdin ]]; then
   data=$(cat "/dev/stdin")
 fi
 
 json="{"
-#echo "$data" | head -n 1
 
 while read line; do
 hname=$(echo "$line" | cut -d " " -f 1 | sed 's/:.*//g' | tr -d '\r')
 hvalue=$(echo "$line" | cut -d " " -f 2- | tr -d '\r' | sed 's/"//g')
-#hvalue=$(echo "$line" | cut -d " " -f 2- | tr -d '\r' | sed "s/\"/'/g")
 json=$(echo "$json\"$hname\": \"$hvalue\",")
 done < <(echo "$data" | grep ":")
 
