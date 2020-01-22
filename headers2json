@@ -5,9 +5,9 @@ if [[ ! -p /dev/stdin && "$#" -eq 0 ]]; then
   exit 1
 fi
 
-arg_from_file=$(echo 'yes')
+arg_from_file=$(echo 'no')
 from_file=""
-arg_multi_input=$(echo 'yes')
+arg_multi_input=$(echo 'no')
 argidx=0 # arg index
 for arg in $@; do
 argidx=$((argidx+1)) # index of arg
