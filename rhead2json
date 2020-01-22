@@ -4,7 +4,8 @@
 # display help banner
 if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
   echo "HTTP Response header to JSON - A utility to convert headers in json format."
-  echo "Usage: 'rhead2json (<file>, <url>, <stdin>) -h, --help'"
+#  echo "Usage: 'rhead2json (<file>, <url>, <stdin>) -h, --help'"
+  echo "Usage: 'rhead2json (<url>) -h, --help'"
   exit
 fi
 
@@ -39,7 +40,8 @@ fi
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
   echo "HTTP Response header to JSON - A utility to convert headers in json format."
-  echo "Usage: 'rhead2json (<file>, <url>, <stdin>)'"
+#  echo "Usage: 'rhead2json (<file>, <url>, <stdin>)'"
+  echo "Usage: 'rhead2json (<url>)'"
   exit
 fi
 
