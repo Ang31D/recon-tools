@@ -5,7 +5,7 @@
 # display help banner
 if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
   echo "Uri Grep - A utility for quickly return uri/url links."
-  echo "Usage: 'urigrep (<url>, <stdin>) -h, --help'"
+  echo "Usage: 'urigrep (<url>) -h, --help'"
   exit
 fi
 
