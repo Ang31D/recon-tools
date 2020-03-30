@@ -1,0 +1,166 @@
+#!/bin/bash
+# get url and index
+# by AngelD
+
+# UrlIndex — Curl url and store hash in index
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Index Url - Curl url and store hash in index."
+  echo "Usage: 'urlindex (<url>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_curl_silent=$(echo 'no')
+arg_curl_verbose=$(echo 'no')
+arg_curl_insecure=$(echo 'no')
+arg_output=$(echo 'no')
+out_folder=$(echo 'index_data/')
+#out_folder=$(echo '')
+arg_only_index=$(echo 'no')
+arg_check_index=$(echo 'no')
+arg_filter_url=$(echo 'no')
+index_folder=$(echo '')
+arg_lookup_index=$(echo 'no')
+argidx=0 # arg index
+for arg in $@; do
+  argidx=$((argidx+1)) # index of arg
+  validx=$((argidx+1)) # index of arg-value (next arg)
+
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-k' == "${arg}" || '--insecure' == "${arg}" || '--skip-ssl' == "${arg}" ]]; then
+    arg_curl_insecure=$(echo 'yes')
+  elif [[ '-L' == "${arg}" || '--locationt' == "${arg}" || '--follow' == "${arg}" ]]; then
+    arg_curl_insecure=$(echo 'yes')
+  elif [[ '-v' == "${arg}" || '--verbose' == "${arg}" ]]; then
+    arg_curl_verbose=$(echo 'yes')
+  elif [[ '-s' == "${arg}" || '--silent' == "${arg}" ]]; then
+    arg_curl_silent=$(echo 'yes')
+  elif [[ '-o' == "${arg}" || '--output' == "${arg}" ]]; then
+    arg_output=$(echo 'yes')
+    out_folder="${!validx}"
+  elif [[ '-I' == "${arg}" || '--only-index' == "${arg}" ]]; then
+    arg_only_index=$(echo 'yes')
+  elif [[ '-f' == "${arg}" || '--filter-url' == "${arg}" ]]; then
+    arg_filter_url=$(echo 'yes')
+    index_folder="${!validx}"
+  elif [[ '-l' == "${arg}" || '--lookup-index' == "${arg}" ]]; then
+    arg_lookup_index=$(echo 'yes')
+ fi
+done
+
+#---- clean-up folder path(s) ----
+if [[ $arg_output == 'yes' ]]; then
+  if [[ "${out_folder}" == *"/" ]]; then
+    out_folder=$(echo "${out_folder}" | sed 's/\/$//g')
+  fi
+fi
+if [[ $arg_filter_url == 'yes' ]]; then
+  if [[ "${index_folder}" == *"/" ]]; then
+    index_folder=$(echo "${index_folder}" | sed 's/\/$//g')
+  fi
+  if [[ "${index_folder}" == "-"* ]]; then
+    index_folder=$(echo '')
+  fi
+fi
+
+#---- validate options ----
+if [[ $arg_output == 'yes' ]]; then
+  if [[ "${#out_folder}" -eq 0 || "$out_folder" == "-"* ]]; then
+    echo "urlindex: invalid folder -- '$out_folder'"
+    arg_show_help=$(echo 'yes')
+  fi
+fi
+if [[ $arg_filter_url == 'yes' ]]; then
+  if [[ "${#index_folder}" -eq 0 && "${#out_folder}" -gt 0 ]]; then
+    index_folder=$(echo "${out_folder}")
+  fi
+  if [[ ! -d "${index_folder}" ]]; then
+    echo "urlindex: invalid folder -- '$index_folder'"
+    arg_show_help=$(echo 'yes')
+  fi
+fi
+
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Url Index - A utility for quickly searching presorted DNS names."
+  echo "Usage: 'urlindex (<url>) [-v, -k, -s] [-o, -I] [options]'"
+  echo '(no-option)               (default) list (split on ","), filter on domain'
+  echo '  -h, --help              display this help and exit'
+# // curl options
+  echo '  -v, --verbose                 Make the operation more talkative (curl)'
+  echo "  -s, --silent                  Silent mode (don't output anything, curl)"
+  echo '  -k, --insecure, --skip-ssl    Allow connections to SSL sites without certs (curl)'
+  echo '  -L, --location, --follow      Follow redirects (curl)'
+# // script options
+  echo '  -o, --output <folder>       Write to FILE to output folder'
+  echo '  -I, --only-index            Only index (index file content, default: no)'
+  echo '  -f, --filter-url <folder    Only urls not been indexed (md5 file)'
+  echo '  -l, --lookup-index          Show url for index (md5 hash, index file)'
+  exit
+fi
+
+# read list of dns
+if [ -p /dev/stdin ]; then
+  urls=$(cat "/dev/stdin") # from std input (piped output)
+else
+  urls=$(echo $1) # from input
+fi
+
+if [[ $arg_output == 'yes' &&  ! -d "${out_folder}" ]]; then
+  mkdir -p "${out_folder}"
+fi
+
+for url in $urls; do
+  index=$(echo "'$url'" | md5sum | sed 's/ .*//g')
+  if [[ $arg_filter_url == 'yes' ]]; then
+    if [[ ! -f "${out_folder}/${index}" ]];then
+      echo "${url}"
+    else
+      echo "  (exists) ${url}"
+    fi
+    continue
+  fi
+
+  if [[ $arg_only_index == 'no' ]]; then
+    # // build curl command
+    curl_cmd=$(echo "curl")
+    if [[ $arg_curl_silent == 'yes' ]]; then
+      curl_cmd=$(echo "${curl_cmd} -s")
+    fi
+    if [[ $arg_curl_verbose == 'yes' ]]; then
+      curl_cmd=$(echo "${curl_cmd} -v")
+    fi
+    if [[ $arg_curl_insecure == 'yes' ]]; then
+#      curl_cmd=$(echo "${curl_cmd}" | tee "${out_folder}/${index}")
+      curl_cmd=$(echo "${curl_cmd} -k")
+    fi
+# // execute curl
+    cmd_curl=$(echo "${curl_cmd} ${url}" | tee "${out_folder}/${index}")
+    # // curl if not already indexed
+    if [[ ! -f "${out_folder}/${index}" ]];then
+      if [[ $arg_output == 'yes' ]]; then
+        echo "${curl_cmd} ${url} | tee ${out_folder}/${index}"
+#        "${curl_cmd} ${url}" | tee "${out_folder}/${index}"
+#        "${curl_cmd[@]}"
+      fi
+    fi
+  fi
+
+  if [[ $arg_output == 'yes' ]]; then
+    # // check for existing index
+    find_index=$(echo '')
+    if [[ -f "${out_folder}/index" ]]; then
+      find_index=$(grep -E "^${index}:" "${out_folder}/index")
+    fi
+    # // only write to index if not found, prevent duplicate entries
+    if [[ "${#find_index}" -eq 0 ]]; then
+      echo "${index}:${url}" >> "${out_folder}/index"
+    fi
+  else
+    echo "${index}:${url}"
+  fi
+done
