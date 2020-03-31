@@ -15,7 +15,6 @@ arg_show_help=$(echo 'no')
 arg_curl_silent=$(echo 'no')
 arg_curl_verbose=$(echo 'no')
 arg_curl_insecure=$(echo 'no')
-#arg_out_folder=$(echo 'no')
 arg_out_folder=$(echo 'yes')
 out_folder=$(echo 'index_data/')
 arg_dry_run=$(echo 'no')
@@ -24,6 +23,8 @@ arg_filter_no_index=$(echo 'no')
 index_folder=$(echo '')
 arg_hash=$(echo 'no')
 arg_lookup_index=$(echo 'no')
+index_hash=$(echo '')
+lookup_hash=$(echo '')
 arg_cleanup_index=$(echo 'no')
 argidx=0 # arg index
 for arg in $@; do
@@ -62,6 +63,10 @@ for arg in $@; do
     arg_hash=$(echo 'yes')
   elif [[ '-l' == "${arg}" || '--lookup-index' == "${arg}" ]]; then
     arg_lookup_index=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      lookup_hash="${!validx}"
+    fi
   elif [[ '--dry-run' == "${arg}" ]]; then
     arg_dry_run=$(echo 'yes')
   elif [[ '--cleanup' == "${arg}" ]]; then
@@ -86,7 +91,7 @@ fi
 
 #---- validate options ----
 if [[ $arg_show_help == 'no' ]]; then
-if [[ $arg_cleanup_index == 'no' ]] && [[ ! -p "/dev/stdin" && ! "$1" == "http"* ]]; then
+if [[ $arg_cleanup_index == 'no' && $arg_lookup_index == 'no' ]] && [[ ! -p "/dev/stdin" && ! "$1" == "http"* ]]; then
   echo "urlindex: invalid url -- '$1'"
   arg_show_help=$(echo 'yes')
 fi
@@ -105,6 +110,14 @@ if [[ $arg_filter_indexed == 'yes' || $arg_filter_no_index == 'yes' ]]; then
     arg_show_help=$(echo 'yes')
   fi
 fi
+
+#if [[ $arg_lookup_index == 'yes' && ! -p /dev/stdin ]]; then
+#  index_data=$(echo "$1" | grep -E "^[a-z0-9]{32}$")
+#  if [[ "${#index_data}" -eq 0 ]]; then
+#    echo "urlindex: invalid hash -- '$lookup_hash'"
+#    arg_show_help=$(echo 'yes')
+#  fi
+#fi
 fi
 
 
@@ -122,17 +135,18 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo '  -o, --output <folder>           Write index to output folder (default: ./index_data)'
   echo '  -I, --filter-indexed <folder>   Filter by indexed urls (md5 file)'
   echo '  -N, --filter-no-index <folder>  Filter urls not in index (md5 file)'
-  echo "  -H, --hash                      Hash input"
-  echo '  -l, --lookup (<index>)          Show url for index (md5 hash, index file)'
-  echo '  --cleanup                       Cleanup orphan indexes (md5 hash, index file)'
+  echo "  -H, --hash                      Prefix Hash (supports: -I, -N)"
+  echo '  -l, --lookup                    Show url for index (md5 hash, index file)'
+  echo '  --cleanup                       Cleanup orphan indexes (md5-file not in index)'
   echo '  -D, --dry-run                   Dry, do not store in files.'
   exit
 fi
 
 if [ -p /dev/stdin ]; then
-  urls=$(cat "/dev/stdin") # from std input (piped output)
+  #urls=$(cat "/dev/stdin") # from std input (piped output)
+  data=$(cat "/dev/stdin") # from std input (piped output)
 else
-  urls=$(echo $1) # from input
+  data=$(echo $1) # from input
 fi
 
 # // create folder path if not exists
@@ -145,14 +159,15 @@ if [[ $arg_out_folder == 'yes' &&  ! -d "${out_folder}" ]]; then
 fi
 
 if [[ $arg_cleanup_index == 'yes' ]]; then
-  #echo "remove orphan index files"
   index_list=$(ls "${out_folder}/" | grep -Ev "^index$")
   for index in $index_list; do
     index_data=$(grep -n -E "^${index}:" "${out_folder}/index")
     if [[ "${#index_data}" -eq 0 ]]; then
+      # // remove orphan index files
       if [[ $arg_dry_run == 'no' ]]; then
         rm "${out_folder}/${index}"
       else
+        # // list orphan index files that should be removed
         echo "${out_folder}/${index}"
       fi
     fi
@@ -160,29 +175,61 @@ if [[ $arg_cleanup_index == 'yes' ]]; then
   exit
 fi
 
-for url in $urls; do
-  index=$(echo "'$url'" | md5sum | sed 's/ .*//g')
+for item in $data; do
+  index=$(echo "'$item'" | md5sum | sed 's/ .*//g')
+
+#  index_data=$(echo "$1" | grep -E "^[a-z0-9]{32}$")
+#  if [[ "${#index_data}" -eq 0 ]]; then
+#    echo "urlindex: invalid hash -- '$lookup_hash'"
+  # // output (resource) item by index hash
+  if [[ $arg_lookup_index == 'yes' ]]; then
+    index_data=$(echo "${item}" | grep -E "^[a-z0-9]{32}$")
+    # // invalid md5 hash
+    if [[ "${#index_data}" -eq 0 ]]; then
+      echo "invalid md5 hash -- '${item}'"
+      continue
+    fi
+    if [[ -f "${out_folder}/index" ]]; then
+      index_data=$(grep -E "^${item}:" "${out_folder}/index")
+      if [[ "${#index_data}" -gt 0 ]]; then
+        #echo $index_data
+        index_hash=$(echo $index_data | cut -d: -f 1)
+        index_item=$(echo $index_data | cut -d: -f 2-)
+        if [[ $arg_hash == 'yes' ]]; then
+          echo "${index_hash}:${index_item}"
+        else
+          echo "${index_item}"
+        fi
+      fi
+    fi
+    continue
+  fi
   # // for both filter on indexed and no-index:
-  # // only output filtered urls so we can
+  # // only output filtered data so we can
   # // pipe the result to urlindex again.
   if [[ $arg_filter_no_index == 'yes' ]]; then
-    if [[ ! -f "${out_folder}/${index}" ]];then
+    if [[ ! -f "${out_folder}/${index}" ]]; then
       if [[ $arg_hash == 'yes' ]]; then
-        echo "${index}:${url}"
+        echo "${index}:${item}"
       else
-        echo "${url}"
+        echo "${item}"
       fi
     fi
     continue
   fi
   if [[ $arg_filter_indexed == 'yes' ]]; then
-    if [[ -f "${out_folder}/${index}" ]];then
+    if [[ -f "${out_folder}/${index}" ]]; then
       if [[ $arg_hash == 'yes' ]]; then
-        echo "${index}:${url}"
+        echo "${index}:${item}"
       else
-        echo "${url}"
+        echo "${item}"
       fi
     fi
+    continue
+  fi
+  # // checkout realpath: relative to absolute path
+  if [[ $arg_hash == 'yes' ]]; then
+    echo "${index}:${item}"
     continue
   fi
 
@@ -203,17 +250,17 @@ for url in $urls; do
   if [[ ! -f "${out_folder}/${index}" ]]; then
     if [[ $arg_out_folder == 'yes' ]]; then
       if [[ $arg_dry_run == 'no' ]]; then
-        echo "${url}" >> "${out_folder}/${index}"
+        echo "${item}" >> "${out_folder}/${index}"
       else
-        #echo "${index} <- ${url}"
-        echo "${out_folder}/${index} <- ${url}"
+        #echo "${index} <- ${item}"
+        echo "${out_folder}/${index} <- ${item}"
       fi
     fi
   elif [[ $arg_dry_run == 'yes' ]]; then
-    #echo "index -> ${index}:${url}"
-    echo "${out_folder}/${index} -> ${index}:${url}"
-#        echo "${curl_cmd} ${url} | tee ${out_folder}/${index}"
-#        "${curl_cmd} ${url}" | tee "${out_folder}/${index}"
+    #echo "index -> ${index}:${item}"
+    echo "${out_folder}/${index} -> ${index}:${item}"
+#        echo "${curl_cmd} ${item} | tee ${out_folder}/${index}"
+#        "${curl_cmd} ${item}" | tee "${out_folder}/${index}"
 #        "${curl_cmd[@]}"
   fi
 
@@ -222,33 +269,33 @@ for url in $urls; do
   index_data=$(echo '')
   index_row=$(echo 0)
   index_hash=$(echo '')
-  index_url=$(echo '')
+  index_item=$(echo '')
   if [[ -f "${out_folder}/index" ]]; then
     index_data=$(grep -n -E "^${index}:" "${out_folder}/index")
     if [[ "${#index_data}" -gt 0 ]]; then
       #echo $index_data
       index_row=$(echo $index_data | cut -d: -f 1)
       index_hash=$(echo $index_data | cut -d: -f 2)
-      index_url=$(echo $index_data | cut -d: -f 3-)
-      #echo "index(row: ${index_row}).data: ${index_hash}:${index_url}"
+      index_item=$(echo $index_data | cut -d: -f 3-)
+      #echo "index(row: ${index_row}).data: ${index_hash}:${index_item}"
     fi
   fi
   # // index does't exists
   if [[ "${#index_data}" -eq 0 ]]; then
     if [[ $arg_out_folder == 'yes' ]]; then
       if [[ $arg_dry_run == 'no' ]]; then
-        echo "${index}:${url}" >> "${out_folder}/index"
+        echo "${index}:${item}" >> "${out_folder}/index"
       else
-        #echo "${index}:${url} -> index"
-        echo "${out_folder}/index <- ${index}:${url}"
+        #echo "${index}:${item} -> index"
+        echo "${out_folder}/index <- ${index}:${item}"
       fi
     elif [[ $arg_dry_run == 'yes' ]]; then
-      #echo "${index}:${url} -> index"
-      echo "${out_folder}/index -> ${index}:${url}"
+      #echo "${index}:${item} -> index"
+      echo "${out_folder}/index -> ${index}:${item}"
     fi
   elif [[ $arg_dry_run == 'yes' ]]; then
-    #echo "index -> ${index}:${url}"
-    echo "${out_folder}/index -> ${index}:${url}"
-    #echo "${out_folder}/index:${index_row} -> ${index}:${url}"
+    #echo "index -> ${index}:${item}"
+    echo "${out_folder}/index -> ${index}:${item}"
+    #echo "${out_folder}/index:${index_row} -> ${index}:${item}"
   fi
 done
