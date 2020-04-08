@@ -1,0 +1,152 @@
+#!/bin/bash
+
+
+if [[ "$#" -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Curl indexed url"
+  echo "Usage: 'cidb (<md5-hash>:<url>) ([-v|-i|-D]) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_out_folder=$(echo 'no')
+out_folder=$(echo './')
+arg_include_header=$(echo 'no')
+arg_dump_header=$(echo 'no')
+out_header_folder=$(echo './response_header/')
+arg_dump_header_suffix=$(echo 'no')
+out_header_suffix=$(echo '.header')
+arg_verbose=$(echo 'no')
+
+argidx=0 # arg index
+for arg in $@; do
+  argidx=$((argidx+1)) # index of arg
+  validx=$((argidx+1)) # index of arg-value (next arg)
+
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-o' == "${arg}" || '--output' == "${arg}" ]]; then
+    arg_out_folder=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      out_folder="${!validx}"
+    fi
+  elif [[ '-i' == "${arg}" || '--include' == "${arg}" ]]; then
+    arg_include_header=$(echo 'yes')
+ elif [[ '-D' == "${arg}" || '--dump-header' == "${arg}" ]]; then
+    arg_dump_header=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      out_header_folder="${!validx}"
+    fi
+ elif [[ '-d' == "${arg}" || '--dump-header-suffix' == "${arg}" ]]; then
+    arg_dump_header_suffix=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      out_header_suffix="${!validx}"
+    fi
+  elif [[ '-v' == "${arg}" || '--verbose' == "${arg}" ]]; then
+    arg_verbose=$(echo 'yes')
+  fi
+done
+
+#---- clean-up folder path(s) ----
+if [[ $arg_out_folder == 'yes' ]]; then
+  if [[ "${out_folder}" == *"/" ]]; then
+    out_folder=$(echo "${out_folder}" | sed 's/\/$//g')
+  fi
+fi
+if [[ $arg_dump_header == 'yes' ]]; then
+  if [[ "${out_header_folder}" == *"/" ]]; then
+    out_header_folder=$(echo "${out_header_folder}" | sed 's/\/$//g')
+  fi
+  if [[ "${out_header_suffix}" == "."* ]]; then
+    out_header_suffix=$(echo "${out_header_suffix}" | sed 's/^\.//g')
+  fi
+fi
+
+
+#---- validate options ----
+if [[ $arg_show_help == 'no' ]]; then
+
+hidb_format=$(echo "$1" | grep -E "^[a-z0-9]{32}:http[s]?:")
+url_format=$(echo "$1" | grep -E "^http[s]?:")
+if [[ "${#hidb_format}" -eq 0 && "${#url_format}" -eq 0 ]]; then
+  echo "cidb: incorrect format -- '$1'"
+  exit
+fi
+if [[ $arg_dump_header == 'yes' ]]; then
+  if [[ "${out_folder}" -eq "${out_header_folder}" ]]; then
+    echo "cidb: same out and header folder -- '$out_folder'/'$out_header_folder'"
+    exit
+  fi
+fi
+if [[ $arg_dump_header == 'yes' ]]; then
+  if [[ $arg_include_header == 'yes' || $arg_verbose -eq 'yes' ]]; then
+    echo "cidb: invalid (mixed) options -- '-D and (-i|-v)'"
+    exit
+  fi
+fi
+
+fi
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Curl indexed url - from hash-based index db."
+  echo "Usage: 'cidb (<md5-hash>:<url>) ([-i|-D|-v]) [options]'"
+  echo '  -h, --help                        display this help and exit'
+  echo "  -o, --output <folder>             Write index to folder (default: $out_folder)"
+  echo '  -i, --include                     Include protocol response headers in the output'
+  echo "  -D, --dump-header <folder>        Write the received headers to <folder> (default: $out_header_folder)"
+  echo "  -d, --dump-header-suffix <file>   Write the received headers to file (<hash>.<suffix>) in (-o) folder)"
+  echo '  -v, --verbose                     Make the operation more talkative'
+  exit
+fi
+
+# // create folder path if not exists
+if [[ $arg_out_folder == 'yes' &&  ! -d "${out_folder}" ]]; then
+  mkdir -p "${out_folder}"
+  if [[ ! -d "${out_folder}" ]]; then
+    echo "hidb: failed to create folder -- '$out_folder'"
+    exit
+  fi
+fi
+if [[ $arg_dump_header == 'yes' &&  ! -d "${out_header_folder}" ]]; then
+  mkdir -p "${out_header_folder}"
+  if [[ ! -d "${out_header_folder}" ]]; then
+    echo "hidb: failed to create folder -- '$out_header_folder'"
+    exit
+  fi
+fi
+
+
+if [[ "${#hidb_format}" -gt 0 ]]; then
+  url=$(echo "$1" | cut -d: -f 2-)
+  hash=$(echo "$1" | cut -d: -f 1)
+else
+  url=$(echo "$1")
+  hash=$(echo "$url" | md5sum | sed 's/ .*//g')
+fi
+
+#echo "hash '$hash'"
+#echo "url '$url'"
+
+if [[ $arg_verbose == 'yes' ]]; then
+  #curl -sk -v "$url" 2>$1 "${out_folder}/${hash}"
+  curl -sk -L -v "$url" &> "${out_folder}/${hash}"
+elif [[ $arg_include_header == 'yes' ]]; then
+  curl -sk -L -i "$url" -o "${out_folder}/${hash}"
+elif [[ $arg_include_header == 'yes' ]]; then
+  curl -sk -L "$url" -o "${out_folder}/${hash}" -D "${out_header_folder}/${hash}"
+else
+#// normal output (request body)
+  curl -sk "$url" -o "${out_folder}/${hash}"
+#// include header in output
+#  curl -sk -L -i "$url" -o "${out_folder}/${hash}"
+#// include header in output + header in separate file
+#  curl -sk -L -i "$url" -o "${out_folder}/${hash}" -D "${out_folder}/${hash}.header"
+#// normal output and header in separate file
+#  curl -sk -L "$url" -o "${out_folder}/${hash}" -D "${out_folder}/${hash}.header"
+#  curl -sk -L -v "$url" -o "${out_folder}/${hash}" &> "${out_folder}/${hash}.header.data"
+#// verbose output
+#  curl -sk -L -v "$url" &> "${out_folder}/${hash}"
+fi
