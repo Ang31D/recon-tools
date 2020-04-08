@@ -1,0 +1,363 @@
+#!/bin/bash
+# Get hash of resource and store in index file (.hidb)
+# by AngelD
+
+# Hashed based Index DB — Store md5-hash resource reference
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Hash Index - Hash based Index DB."
+  echo "Usage: 'hidb (<resource>) [options] -h, --help'"
+  exit
+fi
+
+default_db_file='.hidb'
+#default_db_folder='.hidb/'
+
+arg_show_help=$(echo 'no')
+#arg_out_folder=$(echo 'yes')
+arg_out_folder=$(echo 'no')
+out_folder=$(echo './')
+arg_write_index=$(echo 'no')
+arg_dry_run=$(echo 'no')
+arg_filter_indexed=$(echo 'no')
+arg_index_file=$(echo 'no')
+check_index_exists=$(echo 'yes')
+arg_filter_no_index=$(echo 'no')
+index_folder=$(echo '')
+arg_hash=$(echo 'no')
+arg_lookup_index=$(echo 'no')
+arg_index_number=$(echo 'no')
+index_hash=$(echo '')
+lookup_hash=$(echo '')
+arg_cleanup_index=$(echo 'no')
+argidx=0 # arg index
+for arg in $@; do
+  argidx=$((argidx+1)) # index of arg
+  validx=$((argidx+1)) # index of arg-value (next arg)
+
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-o' == "${arg}" || '--output' == "${arg}" ]]; then
+    arg_out_folder=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      out_folder="${!validx}"
+    fi
+  elif [[ '-w' == "${arg}" || '--write' == "${arg}" ]]; then
+    arg_write_index=$(echo 'yes')
+  elif [[ '-I' == "${arg}" || '--indexed' == "${arg}" ]]; then
+    arg_filter_indexed=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '-F' == "${arg}" || '--index-file' == "${arg}" ]]; then
+    arg_index_file=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      check_index_exists="${!validx}"
+    fi
+  elif [[ '-N' == "${arg}" || '--no-index' == "${arg}" ]]; then
+    arg_filter_no_index=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '-H' == "${arg}" || '--hash' == "${arg}" ]]; then
+    arg_hash=$(echo 'yes')
+  elif [[ '-L' == "${arg}" || '--lookup-index' == "${arg}" ]]; then
+    arg_lookup_index=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '-i' == "${arg}" || '--index' == "${arg}" ]]; then
+    arg_index_number=$(echo 'yes')
+  elif [[ '--dry-run' == "${arg}" ]]; then
+    arg_dry_run=$(echo 'yes')
+  elif [[ '--cleanup' == "${arg}" ]]; then
+    arg_cleanup_index=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  fi
+done
+
+#---- clean-up folder path(s) ----
+if [[ $arg_out_folder == 'yes' ]]; then
+  if [[ "${out_folder}" == *"/" ]]; then
+    out_folder=$(echo "${out_folder}" | sed 's/\/$//g')
+  fi
+fi
+if [[ $arg_filter_indexed == 'yes' || $arg_filter_no_index == 'yes' || $arg_cleanup_index == 'yes' ]]; then
+  if [[ "${index_folder}" == *"/" ]]; then
+    index_folder=$(echo "${index_folder}" | sed 's/\/$//g')
+  fi
+  if [[ "${index_folder}" == "-"* ]]; then
+    index_folder=$(echo '')
+  fi
+fi
+
+#---- validate options ----
+if [[ $arg_show_help == 'no' ]]; then
+  if [[ ! -p "/dev/stdin" && ! "$1" == "http"* ]]; then
+    if [[ $arg_filter_indexed == 'no' && $arg_cleanup_index == 'no' && $arg_lookup_index == 'no' ]]; then
+      echo "hidb: invalid url -- '$1'"
+      arg_show_help=$(echo 'yes')
+    fi
+  fi
+
+  if [[ $arg_out_folder == 'yes' ]]; then
+    if [[ "${#out_folder}" -eq 0 || "$out_folder" == "-"* ]]; then
+      echo "hidb: invalid folder -- '$out_folder'"
+      arg_show_help=$(echo 'yes')
+    fi
+  fi
+  if [[ $arg_filter_indexed == 'yes' || $arg_filter_no_index == 'yes' || $arg_cleanup_index == 'yes' || $arg_lookup_index == 'yes' ]]; then
+    if [[ "${#index_folder}" -eq 0 && "${#out_folder}" -gt 0 ]]; then
+      index_folder=$(echo "${out_folder}")
+    fi
+    if [[ ! -d "${index_folder}" ]]; then
+      echo "hidb: invalid folder -- '$index_folder'"
+      arg_show_help=$(echo 'yes')
+    fi
+  fi
+
+  if [[ $arg_index_file == 'yes' ]]; then
+    if [[ $check_index_exists != 'yes' && $check_index_exists != 'no' ]]; then
+      echo "hidb: invalid (yes/no) option -- '$check_index_exists'"
+      arg_show_help=$(echo 'yes')
+    fi
+  fi
+fi
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Hash Index - Manage hash-based index db."
+  echo "Usage: 'hidb (<resource>) [-o|-I|-N|-l] [options]'"
+  echo '  -h, --help                      display this help and exit'
+  echo "  -o, --output <folder>           Write index to output folder (default: $out_folder)"
+  echo '  -w, --write                     Write resource file (md5-files, combine with -o).'
+  echo '  -I, --indexed <folder>          Filter by indexed resources (md5 file)'
+  echo '  -F, --index-file <yes/no>       Check if resource (md5) file exists (yes) or not (no)'
+  echo '  -N, --no-index <folder>         Filter resources not in index (md5 file)'
+  echo "  -H, --hash                      Include hash in output (supports: -I, -N, -l)"
+  echo '  -L, --lookup <folder>           Display resource (from index file) for index (md5 hash)'
+  echo '  -i, --index                     Include Display position (row number) in index file'
+  echo '  --cleanup                       Cleanup orphan indexes (md5-file not in index)'
+  echo '  -D, --dry-run                   Dry, do not store in files.'
+  exit
+fi
+
+if [[ -p "/dev/stdin" ]]; then
+  #urls=$(cat "/dev/stdin") # from std input (piped output)
+  data=$(cat "/dev/stdin") # from std input (piped output)
+elif [[ ! "$1" == "-"* ]]; then
+  data=$(echo "$1") # from input
+elif [[ $arg_filter_indexed == 'yes' ]]; then
+  data=$(cat "$index_folder/$default_db_file" | cut -d: -f 2-)
+fi
+
+# // create folder path if not exists
+if [[ $arg_out_folder == 'yes' &&  ! -d "${out_folder}" ]]; then
+  if [[ $arg_dry_run == 'no' ]]; then
+    mkdir -p "${out_folder}"
+    if [[ ! -d "${out_folder}" ]]; then
+      echo "hidb: failed to create folder -- '$out_folder'"
+      exit
+    fi
+  fi
+fi
+
+if [[ $arg_cleanup_index == 'yes' ]]; then
+  index_list=$(ls "${out_folder}/" | grep -Ev "^index$")
+  for index in $index_list; do
+    index_data=$(grep -n -E "^${index}:" "${out_folder}/${default_db_file}")
+    if [[ "${#index_data}" -eq 0 ]]; then
+      # // remove orphan index files
+      if [[ $arg_dry_run == 'no' ]]; then
+        rm "${out_folder}/${index}"
+      else
+        # // list orphan index files that should be removed
+        echo "${out_folder}/${index}"
+      fi
+    fi
+  done
+  exit
+fi
+
+# // list current indexed items,
+# // view full content with '--hash' option
+if [[ $arg_filter_indexed == 'yes' && ! -p "/dev/stdin" && "$1" == "-"* && $arg_index_file == 'no' ]]; then
+  if [[ "${#index_folder}" -gt 0 && -d "$index_folder" ]]; then
+    if [[ $arg_hash == 'yes' ]]; then
+      cat "${index_folder}/${default_db_file}"
+    else
+      cat "${index_folder}/${default_db_file}" | cut -d: -f 2-
+    fi
+  fi
+  exit
+fi
+
+for item in $data; do
+#  index=$(echo "'$item'" | md5sum | sed 's/ .*//g')
+  index=$(echo "$item" | md5sum | sed 's/ .*//g')
+
+  # // output (resource) item by index hash
+  if [[ $arg_lookup_index == 'yes' ]]; then
+    index_data=$(echo "${item}" | grep -E "^[a-z0-9]{32}$")
+    # // invalid md5 hash
+    if [[ "${#index_data}" -eq 0 ]]; then
+      echo "invalid md5 hash -- '${item}'"
+      continue
+    fi
+    if [[ -f "${index_folder}/${default_db_file}" ]]; then
+      index_data=$(grep -n -E "^${item}:" "${index_folder}/${default_db_file}")
+      #if [[ $arg_index_number == 'yes' ]]; then
+      
+      if [[ "${#index_data}" -gt 0 ]]; then
+        #echo $index_data
+        index_row=$(echo $index_data | cut -d: -f 1)
+        index_hash=$(echo $index_data | cut -d: -f 2)
+        index_item=$(echo $index_data | cut -d: -f 3-)
+        if [[ $arg_hash == 'yes' ]]; then
+          if [[ $arg_index_number == 'yes' ]]; then
+            echo "${index_row}:${index_hash}:${index_item}"
+          else
+            echo "${index_hash}:${index_item}"
+          fi
+        else
+          if [[ $arg_index_number == 'yes' ]]; then
+            echo "${index_row}:${index_item}"
+          else
+            echo "${index_item}"
+          fi
+        fi
+      fi
+    fi
+    continue
+  fi
+
+  # // for both filter on indexed and no-index:
+  # // only output filtered data so we can
+  # // pipe the result to hidb again.
+  if [[ $arg_filter_no_index == 'yes' ]]; then
+    skip_output='yes'
+    if [[ ! -f "${index_folder}/${default_db_file}" ]]; then
+      exit
+    fi
+    index_data=$(grep -E "^${index}:" "${index_folder}/${default_db_file}")
+    if [[ "${#index_data}" -gt 0 ]]; then
+      continue
+    fi
+    if [[ $arg_hash == 'yes' ]]; then
+      echo "${index}:${item}"
+    else
+      echo "${item}"
+    fi
+    continue
+
+    if [[ -f "${index_folder}/${default_db_file}" ]]; then
+      index_data=$(grep -E "^${index}:" "${index_folder}/${default_db_file}")
+      if [[ "${#index_data}" -eq 0 ]]; then
+        if [[ $arg_hash == 'yes' ]]; then
+          echo "${index}:${item}"
+        else
+          echo "${item}"
+        fi
+      fi
+    fi
+    continue
+  fi
+
+  if [[ $arg_filter_indexed == 'yes' ]]; then
+    skip_output='yes'
+    if [[ ! -f "${index_folder}/${default_db_file}" ]]; then
+      exit
+    fi
+
+    index_data=$(grep -E "^${index}:" "${index_folder}/${default_db_file}")
+    if [[ "${#index_data}" -eq 0 ]]; then
+      continue
+    fi
+
+    if [[ $arg_index_file == 'no' ]]; then
+      #skip_output='no'
+      skip_output=$(echo 'no')
+    # // arg_index_file == 'yes'
+    elif [[ $check_index_exists == 'yes' ]]; then
+      if [[ -f "${index_folder}/${index}" ]]; then
+        skip_output='no'
+      fi
+    # // arg_index_file == 'yes' and check_index_exists == 'no'
+    elif [[ ! -f "${index_folder}/${index}" ]]; then
+      skip_output='no'
+    fi
+
+    if [[ "$skip_output" == 'yes' ]]; then
+      continue
+    fi
+
+    if [[ $arg_hash == 'yes' ]]; then
+      echo "${index}:${item}"
+    else
+      echo "${item}"
+    fi
+    continue
+  fi
+
+  # // checkout realpath: relative to absolute path
+  if [[ $arg_hash == 'yes' ]]; then
+    echo "${index}:${item}"
+    continue
+  fi
+
+  if [[ ! -f "${out_folder}/${index}" && $arg_write_index == 'yes' ]]; then
+    if [[ $arg_out_folder == 'yes' ]]; then
+      if [[ $arg_dry_run == 'no' ]]; then
+        echo "${item}" >> "${out_folder}/${index}"
+      else
+        echo "${out_folder}/${index} <- ${item}"
+      fi
+    fi
+  elif [[ $arg_dry_run == 'yes' ]]; then
+    echo "${out_folder}/${index} -> ${index}:${item}"
+  fi
+
+  # // write to index
+  # // check for existing index
+  index_data=$(echo '')
+  index_row=$(echo 0)
+  index_hash=$(echo '')
+  index_item=$(echo '')
+  if [[ -f "${out_folder}/${default_db_file}" ]]; then
+    index_data=$(grep -n -E "^${index}:" "${out_folder}/${default_db_file}")
+    if [[ "${#index_data}" -gt 0 ]]; then
+      #echo $index_data
+      index_row=$(echo $index_data | cut -d: -f 1)
+      index_hash=$(echo $index_data | cut -d: -f 2)
+      index_item=$(echo $index_data | cut -d: -f 3-)
+      #echo "index(row: ${index_row}).data: ${index_hash}:${index_item}"
+    fi
+  fi
+  # // index does't exists
+  if [[ "${#index_data}" -eq 0 ]]; then
+    if [[ $arg_out_folder == 'yes' ]]; then
+      if [[ $arg_dry_run == 'no' ]]; then
+        echo "${index}:${item}" >> "${out_folder}/${default_db_file}"
+      else
+        #echo "${index}:${item} -> index"
+        echo "${out_folder}/${default_db_file} <- ${index}:${item}"
+      fi
+    elif [[ $arg_dry_run == 'yes' ]]; then
+      #echo "${index}:${item} -> index"
+      echo "${out_folder}/${default_db_file} -> ${index}:${item}"
+    fi
+  elif [[ $arg_dry_run == 'yes' ]]; then
+    #echo "index -> ${index}:${item}"
+    echo "${out_folder}/${default_db_file} -> ${index}:${item}"
+    #echo "${out_folder}/${default_db_file}:${index_row} -> ${index}:${item}"
+  fi
+done
