@@ -71,4 +71,42 @@ Usage: 'gurl [<file>] [-b|-p|-d]'
   -r, --reverse-stats         sort stats number of occurrence in reverse
   -f, --filter [<base-url>]   filter on base-url (see 'filter options')
     filter options
-    -n, --stats-number <number>   filter on (base-url) number from the '-s -b' output```
+    -n, --stats-number <number>   filter on (base-url) number from the '-s -b' output
+```
+
+### hidb - Manage hash-based index db.
+```Hash Index - Manage hash-based index db.
+Usage: 'hidb (<resource>) [-o|-I|-N|-l] [options]'
+  -h, --help                      display this help and exit
+  -o, --output <folder>           Write index to output folder (default: ./)
+  -w, --write                     Write resource file (md5-files, combine with -o).
+  -I, --indexed <folder>          Filter by indexed resources (md5 file)
+  -F, --index-file <yes/no>       Check if resource (md5) file exists (yes) or not (no)
+  -N, --no-index <folder>         Filter resources not in index (md5 file)
+  --hash                          Include hash in output (supports: -I, -N, -L)
+  --hash-only                     Only output hash (supports: -I, -N)
+  -L, --lookup <folder>           Display resource (from index file) for index (md5 hash)
+  -n, --position                  Include position (row number) in index file
+  --cleanup                       Cleanup orphan indexes (md5-file not in index)
+  -D, --dry-run                   Dry, do not store in files.
+  ```
+  
+  ### cidb - Curl indexed url - from hash-based index db.
+```Curl indexed url - from hash-based index db.
+Usage: 'cidb (<md5-hash>:<url>) ([-i|-D|-v]) [options]'
+  -h, --help                        display this help and exit
+  -o, --output <folder>             Write index to folder (default: ./)
+  -i, --include                     Include protocol response headers in the output
+  -D, --dump-header <folder>        Write the received headers to <folder> (default: ./response_header/)
+  -d, --dump-header-suffix <file>   Write the received headers to file (<hash>.<suffix>) in (-o) folder)
+  -v, --verbose                     Make the operation more talkative
+  ```
+  
+  ### gidb - Grep hash-based index db.
+```Grep Hash Index - Grep hash-based index db.
+Usage: 'gidb (<file>) -hS|-hH (<folder>) [options]'
+  -h, --help                    display this help and exit
+  -hS, --http-status <folder>   Grep HTTP status in folder (default: .)
+  -hH, --http-header <folder>   Grep HTTP header in folder (default: .)
+  ```
+  
