@@ -135,7 +135,7 @@ if [[ $arg_verbose == 'yes' ]]; then
   curl -sk -L -v "$url" &> "${out_folder}/${hash}"
 elif [[ $arg_include_header == 'yes' ]]; then
   curl -sk -L -i "$url" -o "${out_folder}/${hash}"
-elif [[ $arg_include_header == 'yes' ]]; then
+elif [[ $arg_dump_header == 'yes' ]]; then
   curl -sk -L "$url" -o "${out_folder}/${hash}" -D "${out_header_folder}/${hash}"
 else
 #// normal output (request body)
