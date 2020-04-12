@@ -60,3 +60,15 @@ All tools has a help section by using the '-h' argument.
 ```urigrep https://www.google.com```
 
 ```curl -s https://www.google.com | urigrep```
+
+### gurl - Grep Url - Parse url.
+```Grep Url - Parse url
+Usage: 'gurl [<file>] [-b|-p|-d]'
+  -p, --parse-uri-path        (default) output uri '</path>' (exclude 'http(s)://<host-dns>')
+  -b, --parse-base-url        output root-url 'http(s)://<host-dns>' (exclude '</path>*')
+  -d, --parse-domain          output unique host dns (exclude 'http(s)://' and '</path>*')
+  -s, --show-stats            show number of occurrence and sequence
+  -r, --reverse-stats         sort stats number of occurrence in reverse
+  -f, --filter [<base-url>]   filter on base-url (see 'filter options')
+    filter options
+    -n, --stats-number <number>   filter on (base-url) number from the '-s -b' output```
