@@ -1,0 +1,99 @@
+#!/bin/bash
+
+arg_http_status=$(echo 'no')
+arg_http_header=$(echo 'no')
+index_folder='./'
+argidx=0 # arg index
+for arg in $@; do
+  argidx=$((argidx+1)) # index of arg
+  validx=$((argidx+1)) # index of arg-value (next arg)
+
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-hS' == "${arg}" || '--http-status' == "${arg}" ]]; then
+    arg_http_status=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '-hH' == "${arg}" || '--http-header' == "${arg}" ]]; then
+    arg_http_header=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  fi
+done
+
+#---- clean-up folder path(s) ----
+if [[ "${#index_folder}" -gt 0 ]]; then
+  if [[ "${index_folder}" == *"/" ]]; then
+    index_folder=$(echo "${index_folder}" | sed 's/\/$//g')
+  fi
+fi
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Grep Hash Index - Grep hash-based index db."
+  echo "Usage: 'gidb (<file>) -hS|-hH (<folder>) [options]'"
+  echo '  -h, --help                    display this help and exit'
+  echo "  -hS, --http-status <folder>   Grep HTTP status in folder (default: $index_folder)"
+  echo "  -hH, --http-header <folder>   Grep HTTP header in folder (default: $index_folder)"
+  exit
+fi
+
+
+if [[ -p "/dev/stdin" ]]; then
+  files=$(cat "/dev/stdin" | grep -E "^[a-z0-9]{32}$")
+elif [[ ! "$1" == "-"* ]]; then
+  files=$(echo "$1" | grep -E "^[a-z0-9]{32}$") # from input
+else
+  files=$(ls $index_folder/ | grep -E "^[a-z0-9]{32}$")
+fi
+
+if [[ $arg_http_status == 'yes' ]]; then
+  for hash in $files; do
+    url=$(echo "$hash" | hidb -L "$index_folder/")
+    prefix=$(echo "$hash:$url")
+    
+    head=$(cat $index_folder/$hash | head -n 1)
+    include_format=$(echo "$head" | grep -E "^HTTP\/")
+    verbose_format=$(echo "$head" | grep -E "^*   Trying ")
+
+    if [[ "${#include_format}" -gt 0 ]]; then
+      echo "${prefix}:${head}"
+    elif [[ "${#verbose_format}" -gt 0 ]]; then
+      head_end_at=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -nE "^{ \[[0-9]+ bytes data\]" | tail -n 1 | cut -d: -f 1)
+      if [[ "${#head_end_at}" -gt 0 ]]; then
+        data=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | sed -n -e "1,${head_end_at}p" | grep -E "^< HTTP\/")
+      else
+        data=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -E "^< HTTP\/")
+      fi
+      while read status; do
+        echo "${prefix}:${status}"
+      done < <(echo "$data")
+    fi
+  done
+elif [[ $arg_http_header == 'yes' ]]; then
+  for hash in $files; do
+    url=$(echo "$hash" | hidb -L "$index_folder/")
+    prefix=$(echo "$hash:$url")
+
+    head=$(cat $index_folder/$hash | head -n 1)
+    include_format=$(echo "$head" | grep -E "^HTTP\/")
+    verbose_format=$(echo "$head" | grep -E "^*   Trying ")
+
+    if [[ "${#include_format}" -gt 0 ]]; then
+      head_end_at=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -nE "^$" | head -n 1 | cut -d: -f 1)
+      while read header; do
+        if [[ "${#header}" -gt 0 ]]; then
+          echo "${prefix}:${header}"
+        fi
+      done < <(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | sed -n -e "1,${head_end_at}p")
+    elif [[ "${#verbose_format}" -gt 0 ]]; then
+      while read header; do
+        echo "${prefix}:${header}"
+      done < <(cat $index_folder/$hash | grep -E "^< " | sed -e 's/[[:space:]]$//')
+    fi
+  done
+fi
