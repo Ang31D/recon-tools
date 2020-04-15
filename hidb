@@ -139,7 +139,7 @@ fi
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
   echo "Hash Index - Manage hash-based index db."
-  echo "Usage: 'hidb (<resource>) [-o|-I|-N|-l] [options]'"
+  echo "Usage: 'hidb (<resource>) [-o|-I|-N|-L] [options]'"
   echo '  -h, --help                      display this help and exit'
   echo "  -o, --output <folder>           Write index to output folder (default: $out_folder)"
   echo '  -w, --write                     Write resource file (md5-files, combine with -o).'
