@@ -76,7 +76,7 @@ Usage: 'gurl [<file>] [-b|-p|-d]'
 
 ### hidb - Manage hash-based index db.
 ```Hash Index - Manage hash-based index db.
-Usage: 'hidb (<resource>) [-o|-I|-N|-l] [options]'
+Usage: 'hidb (<resource>) [-o|-I|-N|-L] [options]'
   -h, --help                      display this help and exit
   -o, --output <folder>           Write index to output folder (default: ./)
   -w, --write                     Write resource file (md5-files, combine with -o).
