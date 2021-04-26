@@ -1,0 +1,368 @@
+#!/bin/bash
+
+arg_asset_type_http=$(echo 'no')
+asset_folder='./'
+arg_http_status=$(echo 'no')
+arg_http_status_tail=$(echo 'no')
+arg_http_status_head=$(echo 'no')
+arg_http_header=$(echo 'no')
+arg_http_body=$(echo 'no')
+arg_host=$(echo 'no')
+arg_host_filter_not_found=$(echo 'no')
+arg_host_filter_alive=$(echo 'no')
+arg_host_filter_alias=$(echo 'no')
+arg_host_filter_no_alias=$(echo 'no')
+arg_host_filter_ip=$(echo 'no')
+arg_host_filter_ipv4=$(echo 'no')
+arg_host_filter_ipv6=$(echo 'no')
+arg_host_filter_mail=$(echo 'no')
+index_folder='./'
+argidx=0 # arg index
+for arg in $@; do
+  argidx=$((argidx+1)) # index of arg
+  validx=$((argidx+1)) # index of arg-value (next arg)
+
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '--http' == "${arg}" ]]; then
+    arg_asset_type_http=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      asset_folder="${!validx}"
+    fi
+  
+  elif [[ '--http-status-tail' == "${arg}" ]]; then
+    arg_http_status_tail=$(echo 'yes')
+    arg_http_status=$(echo 'yes')
+  elif [[ '--http-status-head' == "${arg}" ]]; then
+    arg_http_status_head=$(echo 'yes')
+    arg_http_status=$(echo 'yes')
+  elif [[ '-hS' == "${arg}" || '--http-status' == "${arg}" ]]; then
+    arg_http_status=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '-hH' == "${arg}" || '--http-header' == "${arg}" ]]; then
+    arg_http_header=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '-hB' == "${arg}" || '--http-body' == "${arg}" ]]; then
+    arg_http_body=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '--host' == "${arg}" ]]; then
+    arg_host=$(echo 'yes')
+    next_arg="${!validx}"
+    if [[ "${next_arg}" != "-"* && "${#next_arg}" -gt 0 ]]; then
+      index_folder="${!validx}"
+    fi
+  elif [[ '--no-host' == "${arg}" ]]; then
+    arg_host_filter_not_found=$(echo 'yes')
+  elif [[ '--host-alive' == "${arg}" ]]; then
+    arg_host_filter_alive=$(echo 'yes')
+  elif [[ '--host-alias' == "${arg}" ]]; then
+    arg_host_filter_alias=$(echo 'yes')
+  elif [[ '--host-no-alias' == "${arg}" ]]; then
+    arg_host_filter_no_alias=$(echo 'yes')
+  elif [[ '--host-ip' == "${arg}" ]]; then
+    arg_host_filter_ip=$(echo 'yes')
+  elif [[ '--host-ipv4' == "${arg}" ]]; then
+    arg_host_filter_ipv4=$(echo 'yes')
+  elif [[ '--host-ipv6' == "${arg}" ]]; then
+    arg_host_filter_ipv6=$(echo 'yes')
+  elif [[ '--host-mail' == "${arg}" ]]; then
+    arg_host_filter_mail=$(echo 'yes')
+  fi
+done
+
+#---- clean-up folder path(s) ----
+if [[ "${#index_folder}" -gt 0 ]]; then
+  if [[ "${index_folder}" == *"/" ]]; then
+    index_folder=$(echo "${index_folder}" | sed 's/\/$//g')
+  fi
+fi
+if [[ "${#asset_folder}" -gt 0 ]]; then
+  if [[ "${v}" == *"/" ]]; then
+    asset_folder=$(echo "${asset_folder}" | sed 's/\/$//g')
+  fi
+fi
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Grep Hash Index - Grep hash-based index db."
+  echo "Usage: 'gidb (<file>) -hS|-hH (<folder>) [options]'"
+  echo '  -h, --help                    display this help and exit'
+  echo "  --http <folder>               Grep HTTP assets in folder (default: $index_folder)"
+  echo "  --http-status                 Grep HTTP status"
+  echo "  --http-status-tail            Only show last HTTP status"
+  echo "  --http-status-head            Only show first HTTP status"
+  echo "  --http-body                   Show HTTP body (no header)"
+  echo "  --http-code                   Show HTTP status_code"
+  echo "  -hS, --http-status <folder>   Grep HTTP status in folder (default: $index_folder)"
+  echo "  -hH, --http-header <folder>   Grep HTTP header in folder (default: $index_folder)"
+  echo "  -hB, --http-body <folder>     Grep HTTP body in folder (default: $index_folder)"
+  echo "  --host <folder>               Grep HOST information in folder (default: $index_folder)"
+  echo "  --no-host                     Filter HOST on 'not found'"
+  echo "  --host-alive                  Filter HOST on not 'not found'"
+  echo "  --host-alias                  Filter HOST on 'is an alias'"
+  echo "  --host-no-alias               Filter HOST on not 'is an alias'"
+  echo "  --host-ip                     Filter HOST on 'has address' or 'has IPv6 address'"
+  echo "  --host-ipv4                   Filter HOST on 'has address'"
+  echo "  --host-ipv6                   Filter HOST on 'has IPv6 address'"
+  echo "  --host-mail                   Filter HOST on 'mail is handled by'"
+  exit
+fi
+
+
+if [[ -p "/dev/stdin" ]]; then
+  files=$(cat "/dev/stdin" | grep -E "^[a-z0-9]{32}$")
+elif [[ ! "$1" == "-"* ]]; then
+  files=$(echo "$1" | grep -E "^[a-z0-9]{32}$") # from input
+else
+  #files=$(ls $index_folder/ | grep -E "^[a-z0-9]{32}$")
+  files=$(ls $asset_folder/ | grep -E "^[a-z0-9]{32}$")
+fi
+
+if [[ $arg_asset_type_http == 'yes' ]]; then
+  for hash in $files; do
+    if [[ ! -f "$asset_folder/$hash" ]]; then
+      continue
+    fi
+
+    url=$(echo "$hash" | hidb -L "$asset_folder/")
+    prefix=$(echo "$hash:$url")
+
+    head=$(cat $asset_folder/$hash | head -n 1)
+    include_format=$(echo "$head" | grep -E "^HTTP\/")
+    verbose_format=$(echo "$head" | grep -E "^*   Trying ")
+    headers_only_format=$(cat $asset_folder/$hash | grep -E "\(zero-length body\)$")
+    body_only_format='no'
+    if [[ "${#include_format}" -gt 0 && "${#verbose_format}" -gt 0  && "${#headers_only_format}" -gt 0 ]]; then
+      body_only_format='yes'
+    fi
+
+    if [[ $arg_http_status == 'yes' ]]; then
+      if [[ $body_only_format == 'yes' ]]; then
+        continue
+      fi
+      if [[ "${#headers_only_format}" -gt 0 ]]; then
+        data=$(cat $asset_folder/$hash | sed -e 's/[[:space:]]$//' | grep -E "^< HTTP\/")
+      elif [[ "${#include_format}" -gt 0 ]]; then
+        data=$(cat $asset_folder/$hash | sed -e 's/[[:space:]]$//' | grep -E "^HTTP\/")
+      elif [[ "${#verbose_format}" -gt 0 ]]; then
+        head_end_at=$(cat $asset_folder/$hash | sed -e 's/[[:space:]]$//' | grep -nE "^{ \[[0-9]+ bytes data\]" | tail -n 1 | cut -d: -f 1)
+        if [[ "${#head_end_at}" -gt 0 ]]; then
+          data=$(cat $asset_folder/$hash | sed -e 's/[[:space:]]$//' | sed -n -e "1,${head_end_at}p" | grep -E "^< HTTP\/")
+        else
+          data=$(cat $asset_folder/$hash | sed -e 's/[[:space:]]$//' | grep -E "^< HTTP\/")
+        fi
+      fi
+
+      if [[ $arg_http_status_tail == 'yes' ]]; then
+        data=$(echo "$data" | tail -n 1)
+      elif [[ $arg_http_status_head == 'yes' ]]; then
+        data=$(echo "$data" | head -n 1)
+      fi
+
+      while read status; do
+        echo "${prefix}:${status}"
+      done < <(echo "$data")
+    fi
+  done
+
+elif [[ $arg_http_status == 'yes' ]]; then
+  for hash in $files; do
+    if [[ ! -f "$index_folder/$hash" ]]; then
+      continue
+    fi
+
+    url=$(echo "$hash" | hidb -L "$index_folder/")
+    prefix=$(echo "$hash:$url")
+    
+    head=$(cat $index_folder/$hash | head -n 1)
+    include_format=$(echo "$head" | grep -E "^HTTP\/")
+    verbose_format=$(echo "$head" | grep -E "^*   Trying ")
+    headers_only_format=$(cat $index_folder/$hash | grep -E "\(zero-length body\)$")
+
+    if [[ "${#headers_only_format}" -gt 0 ]]; then
+      while read status; do
+        echo "${prefix}:${status}"
+      done < <(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -E "^< HTTP\/")
+    elif [[ "${#include_format}" -gt 0 ]]; then
+      echo "${prefix}:${head}"
+    elif [[ "${#verbose_format}" -gt 0 ]]; then
+      head_end_at=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -nE "^{ \[[0-9]+ bytes data\]" | tail -n 1 | cut -d: -f 1)
+      if [[ "${#head_end_at}" -gt 0 ]]; then
+        data=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | sed -n -e "1,${head_end_at}p" | grep -E "^< HTTP\/")
+      else
+        data=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -E "^< HTTP\/")
+      fi
+      while read status; do
+        echo "${prefix}:${status}"
+      done < <(echo "$data")
+    fi
+  done
+elif [[ $arg_http_header == 'yes' ]]; then
+  for hash in $files; do
+    if [[ ! -f "$index_folder/$hash" ]]; then
+      continue
+    fi
+
+    url=$(echo "$hash" | hidb -L "$index_folder/")
+    prefix=$(echo "$hash:$url")
+
+    head=$(cat $index_folder/$hash | head -n 1)
+    include_format=$(echo "$head" | grep -E "^HTTP\/")
+    verbose_format=$(echo "$head" | grep -E "^*   Trying ")
+    headers_only_format=$(cat $index_folder/$hash | grep -E "\(zero-length body\)$")
+
+    if [[ "${#headers_only_format}" -gt 0 ]]; then
+      while read status; do
+        echo "${prefix}:${status}"
+      done < <(cat "$index_folder/$hash")
+    elif [[ "${#include_format}" -gt 0 ]]; then
+      head_end_at=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -nE "^$" | head -n 1 | cut -d: -f 1)
+      while read header; do
+        if [[ "${#header}" -gt 0 ]]; then
+          echo "${prefix}:${header}"
+        fi
+      done < <(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | sed -n -e "1,${head_end_at}p")
+    elif [[ "${#verbose_format}" -gt 0 ]]; then
+      while read header; do
+        echo "${prefix}:${header}"
+      done < <(cat $index_folder/$hash | grep -E "^< " | sed -e 's/[[:space:]]$//')
+    fi
+  done
+#elif [[ $arg_http_body == 'yes' ]]; then
+#  for hash in $files; do
+#    if [[ ! -f "$index_folder/$hash" ]]; then
+#      continue
+#    fi
+#
+#    head=$(cat $index_folder/$hash | head -n 1)
+#    include_format=$(echo "$head" | grep -E "^HTTP\/")
+#    verbose_format=$(echo "$head" | grep -E "^*   Trying ")
+#
+#    #* Connection #0 to host www.nilfiskcfm.com left intact
+#    if [[ "${#include_format}" -gt 0 ]]; then
+#      head_end_at=$(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | grep -nE "^$" | head -n 1 | cut -d: -f 1)
+#      while read header; do
+#        if [[ "${#header}" -gt 0 ]]; then
+#          echo "${prefix}:${header}"
+#        fi
+#      done < <(cat $index_folder/$hash | sed -e 's/[[:space:]]$//' | sed -n -e "1,${head_end_at}p")
+#    elif [[ "${#verbose_format}" -gt 0 ]]; then
+#      while read header; do
+#        echo "${prefix}:${header}"
+#      done < <(cat $index_folder/$hash | grep -E "^< " | sed -e 's/[[:space:]]$//')
+#    fi
+#  done
+elif [[ $arg_host == 'yes' ]]; then
+  for hash in $files; do
+    if [[ ! -f "$index_folder/$hash" ]]; then
+      continue
+    fi
+
+    target=$(echo "$hash" | hidb -L "$index_folder/")
+    prefix=$(echo "$hash:$target")
+    arg_host_filter='no'
+
+    data=$(cat $index_folder/$hash)
+
+    if [[ $arg_host_filter_not_found == 'yes' ]]; then
+      data_match=$(echo "$data" | grep -E "^Host (.+) not found: 3\(NXDOMAIN\)$")
+      if [[ "${#data_match}" -gt 0 ]]; then
+        while read line; do
+          #echo "${prefix}:${line}"
+          echo "${prefix}:not found"
+        done < <(cat $index_folder/$hash)
+      fi
+      continue
+    fi
+    if [[ $arg_host_filter_alive == 'yes' ]]; then
+      #arg_host_filter='yes'
+      data_match=$(echo "$data" | grep -E "^Host (.+) not found: 3\(NXDOMAIN\)$")
+      if [[ "${#data_match}" -gt 0 ]]; then
+        continue
+      fi
+    fi
+
+    if [[ $arg_host_filter_alias == 'yes' ]]; then
+      arg_host_filter='yes'
+      data_match=$(echo "$data" | grep -E "^${target} is an alias for ")
+      if [[ "${#data_match}" -gt 0 ]]; then
+        while read line; do
+          alias_host=$(echo "$line" | cut -d " " -f 1)
+          alias_target=$(echo "$line" | rev | cut -d " " -f 1 | rev)
+          echo "${prefix}:${alias_host} alias for ${alias_target}"
+        done < <(cat $index_folder/$hash | grep -E " is an alias for ")
+      fi
+    fi
+    if [[ $arg_host_filter_no_alias == 'yes' ]]; then
+      arg_host_filter='yes'
+      data_match=$(echo "$data" | grep -E "^${target} is an alias for ")
+      if [[ "${#data_match}" -eq 0 ]]; then
+        while read line; do
+          #alias_host=$(echo "$line" | cut -d " " -f 1)
+          #alias_target=$(echo "$line" | rev | cut -d " " -f 1 | rev)
+          #echo "${prefix}:${alias_host} alias for ${alias_target}"
+          echo "${prefix}:${line}"
+        done < <(cat $index_folder/$hash)
+      fi
+    fi
+    if [[ $arg_host_filter_ip == 'yes' ]]; then
+      arg_host_filter='yes'
+      data_match=$(echo "$data" | grep -E " has address | has IPv6 address ")
+      if [[ "${#data_match}" -gt 0 ]]; then
+        while read line; do
+          ip_host=$(echo "$line" | cut -d " " -f 1)
+          ip_target=$(echo "$line" | rev | cut -d " " -f 1 | rev)
+          echo "${prefix}:${ip_host} has address ${ip_target}"
+        done < <(cat $index_folder/$hash | grep -E " has address | has IPv6 address ")
+      fi
+    fi
+    if [[ $arg_host_filter_ipv4 == 'yes' ]]; then
+      arg_host_filter='yes'
+      data_match=$(echo "$data" | grep -E " has address ")
+      if [[ "${#data_match}" -gt 0 ]]; then
+        while read line; do
+          ip_host=$(echo "$line" | cut -d " " -f 1)
+          ip_target=$(echo "$line" | rev | cut -d " " -f 1 | rev)
+          echo "${prefix}:${ip_host} has address ${ip_target}"
+        done < <(cat $index_folder/$hash | grep -E " has address ")
+      fi
+    fi
+    if [[ $arg_host_filter_ipv6 == 'yes' ]]; then
+      arg_host_filter='yes'
+      data_match=$(echo "$data" | grep -E " has IPv6 address ")
+      if [[ "${#data_match}" -gt 0 ]]; then
+        while read line; do
+          ip_host=$(echo "$line" | cut -d " " -f 1)
+          ip_target=$(echo "$line" | rev | cut -d " " -f 1 | rev)
+          echo "${prefix}:${ip_host} has address ${ip_target}"
+        done < <(cat $index_folder/$hash | grep -E " has IPv6 address ")
+      fi
+    fi
+    if [[ $arg_host_filter_mail == 'yes' ]]; then
+      arg_host_filter='yes'
+      data_match=$(echo "$data" | grep -E " mail is handled by ")
+      if [[ "${#data_match}" -gt 0 ]]; then
+        while read line; do
+          mail_host=$(echo "$line" | cut -d " " -f 1)
+          mail_target=$(echo "$line" | rev | cut -d " " -f 1 | rev)
+          echo "${prefix}:${mail_host} mail handled by ${mail_target}"
+        done < <(cat $index_folder/$hash | grep -E " mail is handled by ")
+      fi
+    fi
+    if [[ $arg_host_filter == 'no' ]]; then
+      while read line; do
+          echo "${prefix}:${line}"
+        done < <(cat $index_folder/$hash)
+    fi
+  done
+fi
