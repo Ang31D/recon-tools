@@ -1,0 +1,3 @@
+#!/bin/bash
+#// https://stackoverflow.com/questions/16090869/how-to-pretty-print-xml-from-the-command-line
+cat $1 | xmllint --format -
