@@ -1,0 +1,28 @@
+#!/bin/bash
+# urldecode - Decode url/uri links
+# by AngelD
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Url Decode - A utility to quickly decode uri/url links."
+  echo "Usage: 'urldecode (<url>) -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+ fi
+done
+
+if [[ -p /dev/stdin ]]; then
+  data=$(cat "/dev/stdin")
+else
+  data=$(echo "$1")
+fi
+
+echo "$data" | sed 's@+@ @g;s@%@\\x@g' | xargs -0 printf "%b"
