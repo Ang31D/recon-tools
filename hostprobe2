@@ -1,0 +1,251 @@
+#!/bin/bash
+# hostprobe - Host Probe
+# by AngelD
+
+#// to include: host found, only host not found,
+#// add -s , prefix status code 200, 300 (alias), 404
+#// the rest should be in hostlookup
+
+# display short help
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Host Probe - utility to check see if a dns/ip exists."
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'hostprobe (<host>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_extract_metadata=$(echo 'no')
+arg_verbose=$(echo 'no')
+arg_only_not_found=$(echo 'no') # working
+arg_raw_output=$(echo 'no') # working
+arg_reverse_lookup=$(echo 'no')
+arg_format=$(echo 'no')
+arg_exclude_not_found=$(echo 'no') # working
+arg_extra_verbose=$(echo 'no')
+arg_meta_domain=$(echo 'no')
+arg_meta_options=''
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-E' == "${arg}" || '--extract-metadata' == "${arg}" ]]; then
+    arg_extract_metadata=$(echo 'yes')
+  elif [[ '-n' == "${arg}" || '--not-found' == "${arg}" ]]; then
+    arg_only_not_found=$(echo 'yes')
+  elif [[ '-r' == "${arg}" || '--raw-output' == "${arg}" ]]; then
+    arg_raw_output=$(echo 'yes')
+  elif [[ '-x' == "${arg}" || '--reverse-lookup' == "${arg}" ]]; then
+    arg_reverse_lookup=$(echo 'yes')
+  elif [[ '-f' == "${arg}" || '--format' == "${arg}" ]]; then
+    arg_format=$(echo 'yes')
+  elif [[ '-N' == "${arg}" || '--exclude-not-found' == "${arg}" ]]; then
+    arg_exclude_not_found=$(echo 'yes')
+  elif [[ '-v' == "${arg}" || '--verbose' == "${arg}" ]]; then
+    arg_verbose=$(echo 'yes')
+  elif [[ '-vv' == "${arg}" || '--extra-verbose' == "${arg}" ]]; then
+    arg_extra_verbose=$(echo 'yes')
+    arg_verbose=$(echo 'yes')
+  elif [[ '-mD' == "${arg}" || '--meta-domain' == "${arg}" ]]; then
+    arg_meta_domain=$(echo 'yes')
+    arg_meta_options="${!validx}"
+  fi
+done
+
+#---- validate options ----
+if [[ ! -p /dev/stdin ]]; then
+  if [[ "$1" != *.* ]] && [[ "$1" != *:* ]]; then
+    echo "hostprobe: invalid host(dns/ip) -- '$1'"
+    arg_show_help=$(echo 'yes')
+  fi
+fi
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Host Probe - utility to check see if a dns/ip exists."
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'hostprobe (<host>) [options]'"
+  echo '  <host>                   the host (domain|ipv4|ipv6) to lookup'
+  echo '  -n, --not-found          only output hosts not found'
+  echo '  -A, --allow-ip           allow probing ip-address'
+  #echo '  -I, --include-false      output non existing verbose output'
+  echo '  -r, --raw                outputs the raw results (supports -N, -v)'
+  echo '  -N, --exclude-not-found  exclude hosts not found, requires -r'
+  echo '  -F, --filter             TO IMPLEMENT: filter raw output (requires -r)'
+  echo '  -x, --resolve            resolve host (supports -f)'
+  echo '  -f --format              outputs "<host> <resolved host,...>" (requires -x)'
+  echo '  -E, --extract-metadata   extract dns/ip (supports -f)'
+  echo '  -v, --verbose            verbose output'
+  echo '  -vv                      extra verbose output'
+  echo '  -mD, --meta-domain       append ,<domain> for ip'
+  echo '  -m <d,i,m|all>, --meta <d,i,m|all> append ,Alias for domain ,Domain for ip, Ip for domain, Mail or All'
+  echo "    meta options"
+  echo "    d, domain-alias        return string containing 'is an alias for'"
+  exit
+fi
+
+# read list of dns
+if [ -p /dev/stdin ]; then
+  host_list=$(cat "/dev/stdin") # from std input (piped output)
+else
+  host_list=$(echo $1) # from input
+fi
+
+for host in $host_list; do
+  # skip host(domain/ip), must contain '.' or ':' (ipV6)
+  if [[ "$host" != *.* ]] && [[ "$host" != *:* ]]; then
+    continue
+  fi
+  result=$(host "$host")
+  result_len="${#result}"
+
+  host_found='yes'
+  dns_nx_domain=$(echo "$result" | grep "(NXDOMAIN)$") # domain/ip not found
+  dns_server_fail=$(echo "$result" | grep "(SERVFAIL)$") # domain/ip not found, due to DNS server issue
+  # https://blog.cloudflare.com/unwrap-the-servfail/
+  if [[ "${#dns_nx_domain}" -gt 0 ]]; then
+    host_found='no'
+  elif [[ "${#dns_server_fail}" -gt 0 ]]; then
+    host_found='no'
+  fi
+
+  host_is_ip=$(echo 'no')
+  host_ip=$(echo $host | grep -E "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
+  if [[ "${#host_ip}" -gt 0 ]]; then
+    host_is_ip=$(echo 'yes')
+  fi
+
+  if [[ $arg_raw_output == 'yes' ]]; then
+    data=$(echo "$result")
+    if [[ $arg_exclude_not_found == 'yes' ]];then
+      data=$(echo "$data" | grep -Ev " not found: ")
+    fi
+    if [[ $arg_verbose == 'yes' ]]; then
+      data=$(echo "$data" | sed "s/^/\[$host\] /g")
+      data=$(echo "$data" | grep -Ev "\] $") # remove 'not found' entries
+    fi
+    echo "$data" | grep -Ev "^$" # remove empty results from output
+    continue
+  fi
+
+  if [[ $arg_only_not_found == 'yes' ]]; then
+    if [[ $host_found == 'no' ]]; then
+      echo "$host"
+    fi
+    continue
+  fi
+
+  meta_alias_for=$(echo "$result" | grep " is an alias for ")
+  meta_ip_address=$(echo "$result" | grep " has address ")
+  meta_ipv6_address=$(echo "$result" | grep " has IPv6 address ")
+  meta_handled_by=$(echo "$result" | grep " mail is handled by ")
+  meta_dn_ptr=$(echo "$result" | grep "domain name pointer") # host is ip address
+
+  if [[ $arg_meta_domain == 'yes' ]];then
+    if [[ "${#meta_dn_ptr}" -gt 0 ]]; then
+      meta_v_domain=$(echo "$result" | rev | cut -d " " -f 1 | rev | sed 's/\.$//g')
+      echo "$host,$meta_v_domain"
+    fi
+    continue
+  fi
+
+  if [[ $arg_reverse_lookup == 'yes' ]];then
+    if [[ $host_found == 'no' ]]; then
+      continue
+    fi
+    if [[ $host_is_ip == 'yes' ]]; then
+      if [[ "${#meta_dn_ptr}" -gt 0 ]]; then
+        meta_v_domain=$(echo "$meta_dn_ptr" | rev | cut -d " " -f 1 | rev | sed 's/\.$//g')
+        output=$(echo "$meta_v_domain" | rev | cut -d " " -f 1 | rev | sed 's/\n/,/g')
+        if [[ $arg_format == 'yes' ]]; then
+          echo "$output" | tr '\n' ',' | sed 's/,$//g' | sed "s/^/$host /g";echo # echo - new line to break out from the prompt
+        else
+          echo "$meta_v_domain"
+        fi
+      else
+        echo "$host"
+      fi
+    else # host is domain
+      if [[ "${#meta_ip_address}" -gt 0 ]]; then
+        meta_v_ip=$(echo "$meta_ip_address" | rev | cut -d " " -f 1 | rev)
+        output=$(echo "$meta_ip_address" | rev | cut -d " " -f 1 | rev | sed 's/\n/,/g')
+        if [[ $arg_format == 'yes' ]]; then
+          echo "$output" | tr '\n' ',' | sed 's/,$//g' | sed "s/^/$host /g";echo # echo - new line to break out from the prompt
+        else
+          echo "$meta_v_ip"
+        fi
+      else
+        echo "$host"
+      fi
+    fi
+    continue
+  fi
+
+  if [[ $host_found == 'no' ]]; then
+    continue
+  fi
+
+  if [[ $arg_extract_metadata == 'yes' ]]; then
+    out_prefix=''
+    if [[ $arg_verbose == 'yes' ]]; then
+      out_prefix=$(echo "[$host] ")
+    fi
+    if [[ "${#meta_alias_for}" -gt 0 ]]; then
+      add_to_out=$(echo "$meta_alias_for" | sed 's/.* //g' | sed 's/\.$//g') # 1 or more rows
+      if [[ $arg_format == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | tr '\n' ',' | sed 's/,$//g' | sed 's/^/alias:/g')
+      fi
+      if [[ $arg_verbose == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | sed "s/^/\[$host\] /g")
+      fi
+      echo "$add_to_out"
+    fi
+    if [[ "${#meta_dn_ptr}" -gt 0 ]]; then
+      add_to_out=$(echo "$meta_dn_ptr" | sed 's/.* //g' | sed 's/\.$//g')
+      if [[ $arg_format == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | tr '\n' ',' | sed 's/,$//g' | sed 's/^/domain:/g')
+      fi
+      if [[ $arg_verbose == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | sed "s/^/\[$host\] /g")
+      fi
+      echo "$add_to_out"
+    fi
+
+    if [[ "${#meta_ip_address}" -gt 0 ]]; then
+      add_to_out=$(echo "$meta_ip_address" | sed 's/.* //g' | sed 's/\.$//g')
+      if [[ $arg_format == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | tr '\n' ',' | sed 's/,$//g' | sed 's/^/ip:/g')
+      fi
+      if [[ $arg_verbose == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | sed "s/^/\[$host\] /g")
+      fi
+      echo "$add_to_out"
+    fi
+    if [[ "${#meta_ipv6_address}" -gt 0 ]]; then
+      add_to_out=$(echo "$meta_ipv6_address" | sed 's/.* //g' | sed 's/\.$//g')
+      if [[ $arg_format == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | tr '\n' ',' | sed 's/,$//g' | sed 's/^/ipv6:/g')
+      fi
+      if [[ $arg_verbose == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | sed "s/^/\[$host\] /g")
+      fi
+      echo "$add_to_out"
+    fi
+
+    if [[ "${#meta_handled_by}" -gt 0 ]]; then
+      add_to_out=$(echo "$meta_handled_by" | sed 's/.* //g' | sed 's/\.$//g')
+      if [[ $arg_format == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | tr '\n' ',' | sed 's/,$//g' | sed 's/^/mail:/g')
+      fi
+      if [[ $arg_verbose == 'yes' ]]; then
+        add_to_out=$(echo "$add_to_out" | sed "s/^/\[$host\] /g")
+      fi
+      echo "$add_to_out"
+    fi
+    continue
+  fi
+
+  echo "$host"
+done
