@@ -142,6 +142,11 @@ const (
 	TypeSHA256		 = "sha256"
 )
 
+type IOC_Debug struct {
+	Data string `json:"data"`
+	Data_Defanged bool `json:"data_defanged"`
+}
+
 type IOC struct {
 	Value string	`json:"item"`
 	Type  IOC_Type	`json:"type"`
@@ -149,6 +154,7 @@ type IOC struct {
 	Data_Defanged bool	`json:"data_defanged"`
 	RootDomain string `json:"rootdomain"`
 	Source_Data   string	`json:"source_data"`
+	Details IOC_Debug 	`json:"debug"`
 }
 
 func main() {
@@ -254,7 +260,8 @@ func extractDomains(data string) []IOC {
 		if (!strings.Contains(strings.ToLower(data), domain)) {//
 			is_ioc = true
 		}
-		out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data, Data_Defanged: has_defang, RootDomain: getRootDomain(domain), Is_IOC: is_ioc})
+		out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data, Data_Defanged: has_defang, RootDomain: getRootDomain(domain), Is_IOC: is_ioc, Details: IOC_Debug{Data: data, Data_Defanged: true}})
+		
 	}
 	return out
 }
