@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-        "bufio"
-        "flag"
-        "os"
-        "strings"
+	"bufio"
+	"flag"
+	"os"
+	"strings"
 	"encoding/json"
 	"regexp"
 
@@ -30,6 +30,10 @@ import (
 // data where source is unknown, could be from Stdin
 
 /*
+replace
+\\r\\n # new line
+\\t # tab
+
 jq '[.[] | select(.type=="domain") | {type: .type, ioc: .ioc}]'
 
 // ioc == domain
@@ -44,6 +48,79 @@ jq '[ .[] | select( .ioc | contains("paloaltonetworks")) ]'
 jq '[ .[] | select( .rootdomain | contains("paloaltonetworks")|not) ]'
 
 jq '[.[] | {ioc: .ioc, data: .data}]'
+
+jq '[ .[] | select(.ioc=="paloaltonetworks") ]'
+
+cat web.content.2 | ./gioc | jq '[.[] | .ioc] | unique[]' | sed 's/"//g'
+
+
+// IOC
+cdaklle.housejjk.com
+celeinkec.com
+cocolco.com
+dolimy.celeinkec.com
+housejjk.com
+jowwln.cocolco.com
+ofhloe.com
+pagbine.ofhloe.com
+pplime.savecarrots.com
+question.eboregi.com
+question.erobegi.com
+thbaw.ofhloe.com
+
+ofhloe[.]com
+celeinkec[.]com
+eboregi[.]com
+savecarrots[.]com
+cocolco[.]com
+housejjk[.]com
+erobegi[.]com
+
+
+// detected as defanged=true
+thbaw.ofhloe.com
+dolimy.celeinkec.com
+question.eboregi.com
+pplime.savecarrots.com
+cocolco.com
+ofhloe.com
+housejjk.com
+question.erobegi.com
+celeinkec.com
+pagbine.ofhloe.com
+jowwln.cocolco.com
+cdaklle.housejjk.com
+
+// detected as default=false
+api.w.org
+app-guse4001.marketo.com
+assets.adobedtm.com
+bpo.gov.mn
+browsehappy.com
+energy.gov.mn
+excite.co.jp
+github.com
+gomakethings.com
+kasperskycontenthub.com
+masm.gov.mn
+mod.gov.mn
+object.prototype.tostring.call # FP
+prismacloud.io
+s.w.org
+schema.org
+style.id # FP
+t.target # FP
+twitter.com
+www.facebook.com
+www.fireeye.com
+www.google.com
+www.linkedin.com
+www.politik.mn
+www.reddit.com
+www.w3.org
+xmlhttp.open # FP
+yahoo.com
+yoast.com
 */
 
 
@@ -74,12 +151,14 @@ func main() {
 	var ioc_list []IOC
 
 	seen := make(map[string]bool)
+	//seen_defang := make(map[string]bool)
 
 	for sc.Scan() {
-		data := sc.Text()
+		data := formatEscapedData(sc.Text())
 
+		//result := extractDefangDomains(data)
 		result := extractDomains(data)
-		if len(result) == 0 {
+		if (len(result) == 0) {
 			continue
 		}
 
@@ -91,11 +170,18 @@ func main() {
 			ioc_list = append(ioc_list, ioc)
 			seen[ioc.Value] = true
 		}
-//		ioc_list = append(ioc_list, result...)
 	}
 
 	iocJsonBlob := iocListAsJsonBlob(ioc_list)
 	fmt.Fprintf(os.Stdout, "%s\n", iocJsonBlob)
+}
+
+func formatEscapedData(data string) string {
+	out := strings.ReplaceAll(data, "\\r\\n", "\n")
+	out = strings.ReplaceAll(out, "\\n", "\n")
+	out = strings.ReplaceAll(out, "\\t", "\t")
+	out = strings.ReplaceAll(out, "\\/", "/")
+	return out
 }
 
 func iocListAsJsonBlob(ioc_list []IOC) string {
@@ -110,13 +196,14 @@ func iocListAsJsonBlob(ioc_list []IOC) string {
 //var dot = `(\.|\p{Z}dot\p{Z}|\p{Z}?(\(dot\)|\[dot\]|\(\.\)|\[\.\]|\{\.\})\p{Z}?)`
 var dot = `(\p{Z}dot\p{Z}|\p{Z}?(\(dot\)|\[dot\]|\(\.\)|\[\.\]|\{\.\})\p{Z}?)`
 var dotRegex = regexp.MustCompile(`(?i)` + dot)
-func dataHasDefang(data string) bool {
+func hasDotDefang(data string) bool {
 	out := false
 	if (dotRegex.MatchString(data)) {
 		out = true
 	}
 	return out
 }
+
 func getRootDomain(domain string) string {
 	return reverseDomain(strings.Join(strings.Split(reverseDomain(domain), ".")[:2], "."))
 }
@@ -128,14 +215,35 @@ func reverseDomain(domain string) string {
         return strings.Join(parts, ".")
 }
 
+var domainRegex = regexp.MustCompile(`(?i)([\p{L}\p{N}][\p{L}\p{N}\-]*` + dot + `)+\p{L}{2,}`)
+//var domainRegex = regexp.MustCompile(`([\p{L}\p{N}][\p{L}\p{N}\-]*` + dot + `)+\p{L}{2,}`)
+// ISSUE: only extracts defanged rootdomain, no subdomain due to removed regular '.' from 'dot' regex pattern
+func extractDefangDomains(data string) []IOC {
+	//out := []IOC{}
+	out := []IOC{}
+
+	result := domainRegex.FindAllString(data, -1)
+	if len(result) == 0 {
+		return out
+	}
+	//for _, domain := range result {
+	for _, domain := range result {
+		domain = strings.ToLower(domain)
+		//fmt.Fprintf(os.Stdout, "%d: %s\n", i, strings.ToLower(domain))
+		out = append(out, IOC{Value: domain, Type: TypeDomain, Data: data, Defanged: true, RootDomain: getRootDomain(domain)})
+	}
+	return out
+}
+
 func extractDomains(data string) []IOC {
 	out := []IOC{}
 	result := xioc.ExtractDomains(data)
 	for _,domain := range result {
-		has_defang := dataHasDefang(data)
-		// seems dataHasDefang triggers fp (true) on '@'
+		has_defang := hasDotDefang(data)
+		domain = strings.ToLower(domain)
+		// hasDotDefang check the whole data,  triggers FP (true) on '@'
 		// check if non '@<domain>' is found in data
-		if (strings.Contains(data, "@" + domain)) {
+		if (strings.Contains(strings.ToLower(data), domain)) {//
 			has_defang = false
 		}
 		out = append(out, IOC{Value: domain, Type: TypeDomain, Data: data, Defanged: has_defang, RootDomain: getRootDomain(domain)})
