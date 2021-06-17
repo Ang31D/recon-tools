@@ -30,9 +30,11 @@ import (
 // data where source is unknown, could be from Stdin
 
 /*
-replace
-\\r\\n # new line
-\\t # tab
+# format escaped web content (replace)
+\\r\\n # \n
+\\n # \n
+\\t # \t
+\\/ # /
 
 jq '[.[] | select(.type=="domain") | {type: .type, ioc: .ioc}]'
 
@@ -52,6 +54,9 @@ jq '[.[] | {ioc: .ioc, data: .data}]'
 jq '[ .[] | select(.ioc=="paloaltonetworks") ]'
 
 cat web.content.2 | ./gioc | jq '[.[] | .ioc] | unique[]' | sed 's/"//g'
+cat web.content | ../gioc | jq '[.[] | select(.defanged==true)][0]'
+cat web.content | ../gioc | jq '[.[] | select(.defanged==true) | .ioc]|unique[]' | sed 's/"//g'
+cat web.content | ../gioc | jq '[.[] | .ioc]|unique[]' | sed 's/"//g' | revasset | sort -V | revasset
 
 
 // IOC
@@ -138,11 +143,12 @@ const (
 )
 
 type IOC struct {
-	Value string	`json:"ioc"`
+	Value string	`json:"item"`
 	Type  IOC_Type	`json:"type"`
-	Defanged bool	`json:"defanged"`
+	Is_IOC  bool	`json:"is_ioc"`
+	Data_Defanged bool	`json:"data_defanged"`
 	RootDomain string `json:"rootdomain"`
-	Data   string	`json:"data"`
+	Source_Data   string	`json:"source_data"`
 }
 
 func main() {
@@ -230,7 +236,8 @@ func extractDefangDomains(data string) []IOC {
 	for _, domain := range result {
 		domain = strings.ToLower(domain)
 		//fmt.Fprintf(os.Stdout, "%d: %s\n", i, strings.ToLower(domain))
-		out = append(out, IOC{Value: domain, Type: TypeDomain, Data: data, Defanged: true, RootDomain: getRootDomain(domain)})
+		//out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data, Defanged: true, RootDomain: getRootDomain(domain)})
+		out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data,  Data_Defanged: true, RootDomain: getRootDomain(domain), Is_IOC: true})
 	}
 	return out
 }
@@ -240,13 +247,14 @@ func extractDomains(data string) []IOC {
 	result := xioc.ExtractDomains(data)
 	for _,domain := range result {
 		has_defang := hasDotDefang(data)
+		is_ioc := false
 		domain = strings.ToLower(domain)
 		// hasDotDefang check the whole data,  triggers FP (true) on '@'
 		// check if non '@<domain>' is found in data
-		if (strings.Contains(strings.ToLower(data), domain)) {//
-			has_defang = false
+		if (!strings.Contains(strings.ToLower(data), domain)) {//
+			is_ioc = true
 		}
-		out = append(out, IOC{Value: domain, Type: TypeDomain, Data: data, Defanged: has_defang, RootDomain: getRootDomain(domain)})
+		out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data, Data_Defanged: has_defang, RootDomain: getRootDomain(domain), Is_IOC: is_ioc})
 	}
 	return out
 }
