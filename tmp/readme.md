@@ -1,4 +1,6 @@
-# TODO
+# GIOC
+
+## TODO
 ```
 // # data input
 // * as argument: -f <file>, -u <url>
@@ -15,7 +17,7 @@
 // data where source is unknown, could be from Stdin
 ```
 
-# Query with JQ
+## Query with JQ
 ```
 jq '[.[] | select(.type=="domain") | {type: .type, ioc: .ioc}]'
 
