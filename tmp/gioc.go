@@ -129,24 +129,57 @@ yoast.com
 */
 
 
-type IOC_Type string
+type IOC_ItemType string
 
 const (
-	TypeIPv4	IOC_Type = "ip4"
-	TypeIPv6		 = "ip6"
-	TypeDomain		 = "domain"
-	TypeURL			 = "url"
-	TypeEmail		 = "email"
-	TypeMD5			 = "md5"
-	TypeSHA1		 = "sha1"
-	TypeSHA256		 = "sha256"
+	IOC_TypeIPv4	IOC_ItemType = "ip4"
+	IOC_TypeIPv6	 = "ip6"
+	IOC_TypeDomain	 = "domain"
+	IOC_TypeURL		 = "url"
+	IOC_TypeEmail	 = "email"
+	IOC_TypeMD5		 = "md5"
+	IOC_TypeSHA1	 = "sha1"
+	IOC_TypeSHA256	 = "sha256"
 )
 
-type IOC_Debug struct {
-	Data string `json:"data"`
-	Data_Defanged bool `json:"data_defanged"`
+type IOC_SourceType string
+
+const (
+	SourceType_Unknown	IOC_SourceType = "unknown"
+	SourceType_File	= "file"
+	SourceType_URL	= "url"
+)
+
+
+type IOC_Tag struct {
+	Name string `json:"name"`
+	Description string `json:"description"`
 }
 
+type IOC_Details struct {
+	Source string `json:"source"`
+	SourceType IOC_SourceType `json:"source_type"`
+	Data string `json:"data"`
+	HasDefang bool `json:"has_defang"`
+}
+
+type IOC_Item struct {
+	Value string `json:"value"`
+	Type  IOC_ItemType	`json:"type"`
+	Verified  bool	`json:"verified"` // Verified_IOC
+	Tags []IOC_Tag	`json:"tags"`
+}
+/*
+type IOC_Item_TypeDomain struct {
+	FQDN string `json:"value"`
+	RootDomain string `json:"rootdomain"`
+}
+*/
+type IOC struct {
+	Item IOC_Item `json:"item"`
+	Details IOC_Details `json:"details"`
+}
+/*
 type IOC struct {
 	Value string	`json:"item"`
 	Type  IOC_Type	`json:"type"`
@@ -154,8 +187,9 @@ type IOC struct {
 	Data_Defanged bool	`json:"data_defanged"`
 	RootDomain string `json:"rootdomain"`
 	Source_Data   string	`json:"source_data"`
-	Details IOC_Debug 	`json:"debug"`
+	Details IOC_Details 	`json:"debug"`
 }
+*/
 
 func main() {
 	sc := getInput()
@@ -175,12 +209,14 @@ func main() {
 		}
 
 		for _, ioc := range result {
-			if (seen[ioc.Value]) {
+			//if (seen[ioc.Value]) {
+			if (seen[ioc.Item.Value]) {
 				continue
 			}
 
 			ioc_list = append(ioc_list, ioc)
-			seen[ioc.Value] = true
+			//seen[ioc.Value] = true
+			seen[ioc.Item.Value] = true
 		}
 	}
 
@@ -227,6 +263,7 @@ func reverseDomain(domain string) string {
         return strings.Join(parts, ".")
 }
 
+/*
 var domainRegex = regexp.MustCompile(`(?i)([\p{L}\p{N}][\p{L}\p{N}\-]*` + dot + `)+\p{L}{2,}`)
 //var domainRegex = regexp.MustCompile(`([\p{L}\p{N}][\p{L}\p{N}\-]*` + dot + `)+\p{L}{2,}`)
 // ISSUE: only extracts defanged rootdomain, no subdomain due to removed regular '.' from 'dot' regex pattern
@@ -242,11 +279,12 @@ func extractDefangDomains(data string) []IOC {
 	for _, domain := range result {
 		domain = strings.ToLower(domain)
 		//fmt.Fprintf(os.Stdout, "%d: %s\n", i, strings.ToLower(domain))
-		//out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data, Defanged: true, RootDomain: getRootDomain(domain)})
-		out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data,  Data_Defanged: true, RootDomain: getRootDomain(domain), Is_IOC: true})
+		//out = append(out, IOC{Value: domain, Type: IOC_TypeDomain, Source_Data: data, Defanged: true, RootDomain: getRootDomain(domain)})
+		out = append(out, IOC{Value: domain, Type: IOC_TypeDomain, Source_Data: data,  Data_Defanged: true, RootDomain: getRootDomain(domain), Is_IOC: true})
 	}
 	return out
 }
+*/
 
 func extractDomains(data string) []IOC {
 	out := []IOC{}
@@ -257,10 +295,16 @@ func extractDomains(data string) []IOC {
 		domain = strings.ToLower(domain)
 		// hasDotDefang check the whole data,  triggers FP (true) on '@'
 		// check if non '@<domain>' is found in data
-		if (!strings.Contains(strings.ToLower(data), domain)) {//
+		if (!strings.Contains(strings.ToLower(data), domain)) {
 			is_ioc = true
 		}
-		out = append(out, IOC{Value: domain, Type: TypeDomain, Source_Data: data, Data_Defanged: has_defang, RootDomain: getRootDomain(domain), Is_IOC: is_ioc, Details: IOC_Debug{Data: data, Data_Defanged: true}})
+		//ioc_item := IOC_Item{Value: domain, Type: IOC_TypeDomain, Verified: is_ioc, Tags: []}
+		var ioc_tags []IOC_Tag
+		ioc_item := IOC_Item{Value: domain, Type: IOC_TypeDomain, Verified: is_ioc, Tags: ioc_tags}
+		ioc_details := IOC_Details{Source: "", SourceType: SourceType_Unknown, Data: data, HasDefang: has_defang}
+		ioc := IOC{Item: ioc_item, Details: ioc_details}
+		out = append(out, ioc)
+		//out = append(out, IOC{Value: domain, Type: IOC_TypeDomain, Source_Data: data, Data_Defanged: has_defang, RootDomain: getRootDomain(domain), Is_IOC: is_ioc, Details: IOC_Details{Data: data, Data_Defanged: true}})
 		
 	}
 	return out
