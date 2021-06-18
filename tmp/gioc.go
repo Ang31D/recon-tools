@@ -12,123 +12,6 @@ import (
 	"github.com/assafmo/xioc/xioc"
 )
 
-// curl -s https://unit42.paloaltonetworks.com/digital-quartermaster-scenario-demonstrated-in-attacks-against-the-mongolian-government/
-
-// TODO
-// # data input
-// * as argument: -f <file>, -u <url>
-//   if arg value is missing (ex -f <empty>) and stdin exists then stdin is arg type (file|url)
-//   * item in stdin
-//     - starts with 'http' = source.type: url
-//     - file exist = source.type: file
-//     - else = data
-// in this way we know the source where we got the IOCs
-//
-// * ioc_source
-//   type: file|url|data
-//   path: filepath|url|<empty>
-// data where source is unknown, could be from Stdin
-
-/*
-# format escaped web content (replace)
-\\r\\n # \n
-\\n # \n
-\\t # \t
-\\/ # /
-
-jq '[.[] | select(.type=="domain") | {type: .type, ioc: .ioc}]'
-
-// ioc == domain
-// ioc != defanged
-// ioc does not contain (paloaltonetworks)
-jq '[.[] | select(.type=="domain")]'
-jq '[.[] | select(.defanged==false)]'
-
-jq '[ .[] | select( .ioc | contains("paloaltonetworks") | not) ]'
-jq '[ .[] | select( .ioc | contains("paloaltonetworks")) ]'
-
-jq '[ .[] | select( .rootdomain | contains("paloaltonetworks")|not) ]'
-
-jq '[.[] | {ioc: .ioc, data: .data}]'
-
-jq '[ .[] | select(.ioc=="paloaltonetworks") ]'
-
-cat web.content.2 | ./gioc | jq '[.[] | .ioc] | unique[]' | sed 's/"//g'
-cat web.content | ../gioc | jq '[.[] | select(.defanged==true)][0]'
-cat web.content | ../gioc | jq '[.[] | select(.defanged==true) | .ioc]|unique[]' | sed 's/"//g'
-cat web.content | ../gioc | jq '[.[] | .ioc]|unique[]' | sed 's/"//g' | revasset | sort -V | revasset
-
-
-// IOC
-cdaklle.housejjk.com
-celeinkec.com
-cocolco.com
-dolimy.celeinkec.com
-housejjk.com
-jowwln.cocolco.com
-ofhloe.com
-pagbine.ofhloe.com
-pplime.savecarrots.com
-question.eboregi.com
-question.erobegi.com
-thbaw.ofhloe.com
-
-ofhloe[.]com
-celeinkec[.]com
-eboregi[.]com
-savecarrots[.]com
-cocolco[.]com
-housejjk[.]com
-erobegi[.]com
-
-
-// detected as defanged=true
-thbaw.ofhloe.com
-dolimy.celeinkec.com
-question.eboregi.com
-pplime.savecarrots.com
-cocolco.com
-ofhloe.com
-housejjk.com
-question.erobegi.com
-celeinkec.com
-pagbine.ofhloe.com
-jowwln.cocolco.com
-cdaklle.housejjk.com
-
-// detected as default=false
-api.w.org
-app-guse4001.marketo.com
-assets.adobedtm.com
-bpo.gov.mn
-browsehappy.com
-energy.gov.mn
-excite.co.jp
-github.com
-gomakethings.com
-kasperskycontenthub.com
-masm.gov.mn
-mod.gov.mn
-object.prototype.tostring.call # FP
-prismacloud.io
-s.w.org
-schema.org
-style.id # FP
-t.target # FP
-twitter.com
-www.facebook.com
-www.fireeye.com
-www.google.com
-www.linkedin.com
-www.politik.mn
-www.reddit.com
-www.w3.org
-xmlhttp.open # FP
-yahoo.com
-yoast.com
-*/
-
-
 type IOC_ItemType string
 
 const (
@@ -145,9 +28,9 @@ const (
 type IOC_SourceType string
 
 const (
-	SourceType_Unknown	IOC_SourceType = "unknown"
-	SourceType_File	= "file"
-	SourceType_URL	= "url"
+	Source_TypeUnknown	IOC_SourceType = "unknown"
+	Source_TypeFile	= "file"
+	Source_TypeURL	= "url"
 )
 
 
@@ -298,13 +181,11 @@ func extractDomains(data string) []IOC {
 		if (!strings.Contains(strings.ToLower(data), domain)) {
 			is_ioc = true
 		}
-		//ioc_item := IOC_Item{Value: domain, Type: IOC_TypeDomain, Verified: is_ioc, Tags: []}
 		var ioc_tags []IOC_Tag
 		ioc_item := IOC_Item{Value: domain, Type: IOC_TypeDomain, Verified: is_ioc, Tags: ioc_tags}
-		ioc_details := IOC_Details{Source: "", SourceType: SourceType_Unknown, Data: data, HasDefang: has_defang}
+		ioc_details := IOC_Details{Source: "", SourceType: Source_TypeUnknown, Data: data, HasDefang: has_defang}
 		ioc := IOC{Item: ioc_item, Details: ioc_details}
 		out = append(out, ioc)
-		//out = append(out, IOC{Value: domain, Type: IOC_TypeDomain, Source_Data: data, Data_Defanged: has_defang, RootDomain: getRootDomain(domain), Is_IOC: is_ioc, Details: IOC_Details{Data: data, Data_Defanged: true}})
 		
 	}
 	return out
