@@ -1,6 +1,5 @@
-
+# TODO
 ```
-// TODO
 // # data input
 // * as argument: -f <file>, -u <url>
 //   if arg value is missing (ex -f <empty>) and stdin exists then stdin is arg type (file|url)
