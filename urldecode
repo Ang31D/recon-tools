@@ -19,6 +19,13 @@ validx=$((argidx+1)) # index of arg-value (next arg)
  fi
 done
 
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Url Decode - A utility to quickly decode uri/url."
+  echo "Usage: 'urldecode (<url>) -h, --help'"
+  exit
+fi
+
 if [[ -p /dev/stdin ]]; then
   data=$(cat "/dev/stdin")
 else
