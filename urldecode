@@ -25,4 +25,4 @@ else
   data=$(echo "$1")
 fi
 
-echo "$data" | sed 's@+@ @g;s@%@\\x@g' | xargs -0 printf "%b"
+echo -e "$data" | sed 's@+@ @g;s@%@\\x@g' | xargs -0 printf "%b"
