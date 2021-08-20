@@ -25,6 +25,7 @@ arg_exclude_not_found=$(echo 'no') # working
 arg_extra_verbose=$(echo 'no')
 arg_meta_domain=$(echo 'no')
 arg_meta_options=''
+arg_dns_server=''
 argidx=0 # arg index
 for arg in $@; do
 argidx=$((argidx+1)) # index of arg
@@ -51,6 +52,8 @@ validx=$((argidx+1)) # index of arg-value (next arg)
   elif [[ '-mD' == "${arg}" || '--meta-domain' == "${arg}" ]]; then
     arg_meta_domain=$(echo 'yes')
     arg_meta_options="${!validx}"
+  elif [[ '-s' == "${arg}" || '--dns-server' == "${arg}" ]]; then
+    arg_dns_server="${!validx}"
   fi
 done
 
@@ -68,6 +71,7 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "stdin/out support for workflow integration"
   echo "Usage: 'hostprobe (<host>) [options]'"
   echo '  <host>                   the host (domain|ipv4|ipv6) to lookup'
+  echo '  -s, --dns-server         dns server to query (optional)'
   echo '  -n, --not-found          only output hosts not found'
   echo '  -A, --allow-ip           allow probing ip-address'
   #echo '  -I, --include-false      output non existing verbose output'
@@ -98,7 +102,11 @@ for host in $host_list; do
   if [[ "$host" != *.* ]] && [[ "$host" != *:* ]]; then
     continue
   fi
-  result=$(host "$host")
+  if [[ ${#arg_dns_server} -gt 0 ]]; then
+    result=$(host "$host" "$arg_dns_server")
+  else
+    result=$(host "$host")
+  fi
   result_len="${#result}"
 
   host_found='yes'
