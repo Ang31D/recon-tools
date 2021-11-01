@@ -1,0 +1,22 @@
+#!/bin/bash
+# geturi - Get Uri
+# by AngelD
+
+# stdin/out support for workflow integration
+# creates the folder structure base on the uri path
+# curls the uri and outputs to file
+
+
+if [[ -p /dev/stdin ]]; then
+  urls=$(cat "/dev/stdin")
+else
+  urls=$(echo "$1")
+fi
+
+for uri in $urls;do
+  path=$(echo $uri | unfurl path)
+  out_file=$(echo $path | sed 's/^\///g')
+  echo $(echo $path | sed 's/^\///g')
+  mkdir -p $(echo $path | rev | cut -d/ -f 2- | rev | sed 's/^\///g')
+  curl -k -s $uri -o $out_file
+done
