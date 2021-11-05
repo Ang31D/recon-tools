@@ -53,7 +53,7 @@ All tools should also support stdin/out for workflow integration.
 
 ```rhead2json https://www.google.com```
 
-```curl -s -IXGET https://www.google.com | tee response.raw | rhead2json | tee response.headers.json```
+```curl -s -IXGET https://www.google.com | tee response.raw | rhead2json | tee response.headers.json | jq```
 
 ### urigrep - A utility for quickly return uri/url links.
 ```Usage: 'urigrep (<url>) -h, --help'```
