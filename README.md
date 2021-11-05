@@ -3,6 +3,8 @@ Tools for Recon
 
 All tools has a help section by using the '-h' argument.
 
+All tools should also support stdin/out for workflow integration.
+
 ## example usage
 
 ### crtsh - A utility for quickly searching presorted DNS names.
