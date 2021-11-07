@@ -6,6 +6,37 @@
 # creates the folder structure base on the uri path
 # curls the uri and outputs to file
 
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Get Uri - download uri as host[:port]/path"
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'geturi (<url>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+timeout_in_seconds=10
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-t' == "${arg}" || '--connect-timeout' == "${arg}" ]]; then
+    timeout_in_seconds="${!validx}"
+  fi
+done
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Get Uri - download uri as host[:port]/path"
+  echo "Usage: 'lsuri (<uri>) [options]'"
+  echo "  -t, --connect-timeout   Maximum time in seconds that you allow the connection to the"
+  echo "                          server to take. This only limits the connection phase, once"
+  echo "                          we have connected this option is of no more use."
+  exit
+fi
+
 
 if [[ -p /dev/stdin ]]; then
   urls=$(cat "/dev/stdin")
@@ -13,10 +44,20 @@ else
   urls=$(echo "$1")
 fi
 
-for uri in $urls;do
-  path=$(echo $uri | unfurl path)
-  out_file=$(echo $path | sed 's/^\///g')
-  echo $(echo $path | sed 's/^\///g')
-  mkdir -p $(echo $path | rev | cut -d/ -f 2- | rev | sed 's/^\///g')
-  curl -k -s $uri -o $out_file
+for url in $urls;do
+  uri_path=$(echo "$url" | unfurl path)
+  pre_out_dir=$(echo "$url" | unfurl format %d:%P)
+  has_port=$(echo "$pre_out_dir" | grep -E ":$")
+  if [[ "${#has_port}" -gt 0 ]]; then
+    pre_out_dir=$(echo "$pre_out_dir" | cut -d: -f 1)
+  fi
+  out_file=$(echo $uri_path | sed 's/^\///g')
+
+  out_dir=$(echo $uri_path | rev | cut -d/ -f 2- | rev | sed 's/^\///g')
+  if [[ "${#out_dir}" -gt 0 ]]; then
+    mkdir -p "$pre_out_dir/$out_dir"
+  fi
+
+  echo "$pre_out_dir/$out_file"
+  curl -k -s --connect-timeout $timeout_in_seconds "$url" -o "$pre_out_dir/$out_file"
 done
