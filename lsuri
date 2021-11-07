@@ -1,0 +1,135 @@
+#!/bin/bash
+# lsuri - ls for web directory listing (content of 'Index of')
+# by AngelD
+
+# stdin/out support for workflow integration
+# list content of directory listing (recursive)
+# curls the uri and prints the directory content (files/directories)
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "List Uri - ls for web directory listing (content of 'Index of')"
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'lsuri (<url>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_recusive=$(echo 'no')
+arg_status=$(echo 'no')
+arg_probe=$(echo 'no')
+arg_verbose=$(echo 'no')
+arg_follow_redirects=$(echo 'no')
+arg_include_full_path=$(echo 'no')
+timeout_in_seconds=10
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-r' == "${arg}" || '--recursive' == "${arg}" ]]; then
+    arg_recusive=$(echo 'yes')
+  elif [[ '-p' == "${arg}" || '--probe' == "${arg}" ]]; then
+    arg_probe=$(echo 'yes')
+  elif [[ '-L' == "${arg}" || '--follow-redirect' == "${arg}" ]]; then
+    arg_follow_redirects=$(echo 'yes')
+  elif [[ '-v' == "${arg}" || '--verbose' == "${arg}" ]]; then
+    arg_verbose=$(echo 'yes')
+  elif [[ '-I' == "${arg}" || '--include-fullpath' == "${arg}" ]]; then
+    arg_include_full_path=$(echo 'yes')
+  elif [[ '-t' == "${arg}" || '--connect-timeout' == "${arg}" ]]; then
+    timeout_in_seconds="${!validx}"
+  fi
+done
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "List Uri - ls for web directory listing (content of 'Index of')"
+  echo "Usage: 'lsuri (<uri>) [options]'"
+  echo "(no-option)               (default) list of file/directory from current directory (uri)"
+  echo "  -h, --help              display this help and exit"
+  echo "  -r, --recursive         list recursive on directory it finds"
+  echo "  -I, --include-fullpath  include full-path refs, likely item icons in directory listing"
+  echo "  -p, --probe             print url if browsable, add -v for status code"
+  echo "  -v, --verbose           verbose output"
+  echo "  -L, --follow-redirect   follow redirects"
+  echo "  -t, --connect-timeout   Maximum time in seconds that you allow the connection to the"
+  echo "                          server to take. This only limits the connection phase, once"
+  echo "                          we have connected this option is of no more use."
+  exit
+fi
+
+if [[ -p /dev/stdin ]]; then
+  urls=$(cat "/dev/stdin")
+else
+  urls=$(echo "$1")
+fi
+
+curl_options="-s -k --connect-timeout $timeout_in_seconds"
+if [[ $arg_follow_redirects == 'yes' ]]; then
+  curl_options=$(echo "$curl_options -L")
+fi
+
+for url in $urls;do
+  if [[ $arg_probe == 'yes' ]]; then
+    status=$(curl $curl_options -IXGET "$url" -A '' | head -n 1)
+
+    http_status_code=$(echo "$status" | cut -d " " -f 2)
+    if [[ $arg_verbose == 'yes' ]]; then
+      echo "[$http_status_code] - $url"
+    elif [[ $http_status_code != '404' ]]; then
+      echo "$url"
+    fi
+    continue
+  fi
+
+  check_uri=$(echo "$url" | grep -E "\/$")
+  if [[ "${#check_uri}" -eq 0 ]]; then
+    url=$(echo "${url}/")
+  fi
+
+  data=$(curl $curl_options "$url")
+
+  is_index_of=$(echo "$data" | grep -E "Index of ")
+  if [[ "${#is_index_of}" -eq 0 ]]; then
+    if [[ $arg_verbose == 'yes' ]]; then
+      echo "lsuri: 'Index of' not found -- '$url'"
+    fi
+    continue
+  fi
+
+  uris=$(echo "$data" | urigrep  | tail -n +3 | sort -V)
+  
+  file_list=$(echo "$uris" | grep -Ev "^\/|\/$")
+  for file_name in $file_list;do
+    echo "${url}${file_name}"
+  done
+
+  # skip by default the output as it's likely the item icon in the directory listing
+  if [[ $arg_include_full_path == 'yes' ]]; then
+    base_url=$(echo "$url" | cut -d/ -f -3 | sed 's/$/\//g')
+    path_list=$(echo "$uris" | grep -E "^\/")
+    for path in $path_list;do
+      relative_path=$(echo "$path" | sed 's/^\///g')
+      echo "${base_url}${relative_path}"
+    done
+  fi
+
+  dir_list=$(echo "$uris" | grep -E "\/$")
+  for dir_name in $dir_list;do
+    echo "${url}${dir_name}"
+
+    # recursively call the (this) script again for next directory listing
+    #
+    # NOTE:
+    # For the recursive to work we need to pipe it to stdout due to
+    # how we read the input. We first check if stdin has data and
+    # if so use it as input instead of first ($1) argument.
+    if [[ $arg_recusive == 'yes' ]]; then
+      #echo "${url}${dir_name}" | lsuri -r
+      # lets call the script by "$0" if we rename the (script) filename
+      echo "${url}${dir_name}" | "$0" -r
+    fi
+  done
+done
