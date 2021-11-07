@@ -1,0 +1,38 @@
+#!/bin/bash
+# httpmirror - mirror web directory recursively, <url> as root directory
+# by AngelD
+
+# display short help
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "HTTP Mirror - mirror web directory recursively, <url> as root directory"
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'httpmirror (<url>) -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  fi
+done
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "HTTP Mirror - mirror web directory recursively, <url> as root directory"
+  echo "Usage: 'httpmirror (<uri>)'"
+  exit
+fi
+
+if [[ -p /dev/stdin ]]; then
+  urls=$(cat "/dev/stdin")
+else
+  urls=$(echo "$1")
+fi
+
+for url in $urls;do
+  wget --no-check-certificate --no-parent -r "$url"
+done
