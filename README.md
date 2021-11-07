@@ -39,13 +39,13 @@ All tools should also support stdin/out for workflow integration.
 
 ```cat <dns_file> | hostprobe```
 
-### rdns - Reverse of each sub-name (ex. com.google).
-```Usage: 'rdns (<file> | -r <dns>) -h, --help'```
+### revasset - Reverse of each sub-name (ex. com.google).
+```Usage: 'revasset (<dns> | <ip>) -h, --help'```
 * Reverse each sub-name (ex. com.google)
 
-```rdns google.com```
+```revasset google.com```
 
-```cat <dns_list> | rdns```
+```cat <dns_list> | revasset```
 
 ### rhead2json - A utility to convert HTTP response header to json format.
 ```Usage: 'rhead2json (<url>) -h, --help'```
