@@ -1,31 +1,34 @@
 #!/bin/bash
-# HTTP Response header to JSON - A utility to convert HTTP response header to json format.
+# rhead2json - convert HTTP response header to json format
 # by AngelD
 
 # display help banner
 if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
-  echo "HTTP Response header to JSON - A utility to convert headers in json format."
-  echo "Usage: 'rhead2json (<url>) -h, --help'"
+  echo "HTTP Headers to JSON - fetch and converts HTTP response headers in json format"
+  echo "Usage: 'rhead2json (<url>) [options] -h, --help'"
   exit
 fi
 
 arg_show_help=$(echo 'no')
+arg_insert_url=$(echo 'no')
+timeout_in_seconds=10
 argidx=0 # arg index
 for arg in $@; do
 argidx=$((argidx+1)) # index of arg
 validx=$((argidx+1)) # index of arg-value (next arg)
   if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
     arg_show_help=$(echo 'yes')
+  elif [[ '-i' == "${arg}" || '--insert-url' == "${arg}" ]]; then
+    arg_insert_url=$(echo 'yes')
+  elif [[ '-t' == "${arg}" || '--connect-timeout' == "${arg}" ]]; then
+    timeout_in_seconds="${!validx}"
  fi
 done
 
 #---- validate options ----
 if [[ $arg_show_help == 'no' ]]; then
 if [[ $# -gt 0 ]]; then
-  if [[ $# -ne 1 ]]; then
-    echo "rhead2json: invalid options -- '$@'"
-    arg_show_help=$(echo 'yes')
-  elif [[ "$1" != "http"* ]]; then
+  if [[ "$1" != "http"* ]]; then
     echo "rhead2json: invalid url -- '$1'"
     arg_show_help=$(echo 'yes')
   fi
@@ -34,13 +37,17 @@ fi
 
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
-  echo "HTTP Response header to JSON - A utility to convert headers in json format."
-  echo "Usage: 'rhead2json (<url>)'"
+  echo "HTTP Response header to JSON - A utility to convert headers in json format"
+  echo "Usage: 'rhead2json (<url>) [options]'"
+  echo "  -i, --insert-url        Insert url as 'Url'"
+  echo "  -t, --connect-timeout   Maximum time in seconds that you allow the connection to the"
+  echo "                          server to take. This only limits the connection phase, once"
+  echo "                          we have connected this option is of no more use."
   exit
 fi
 
-if [[ "$#" -eq 1 ]]; then
-  data=$(curl -s -IXGET "$1")
+if [[ "$#" -ge 1 ]]; then
+  data=$(curl -s -k -IXGET "$1" -A '' --connect-timeout $timeout_in_seconds)
 elif [[ -p /dev/stdin ]]; then
   data=$(cat "/dev/stdin")
 fi
@@ -48,13 +55,25 @@ fi
 json="{"
 
 while read line; do
-hname=$(echo "$line" | cut -d " " -f 1 | sed 's/:.*//g' | tr -d '\r')
-hvalue=$(echo "$line" | cut -d " " -f 2- | tr -d '\r' | sed 's/"//g')
-json=$(echo "$json\"$hname\": \"$hvalue\",")
+  hname=$(echo "$line" | cut -d " " -f 1 | sed 's/:.*//g' | tr -d '\r')
+  hvalue=$(echo "$line" | cut -d " " -f 2- | tr -d '\r' | sed 's/"//g')
+  json=$(echo "$json\"$hname\": \"$hvalue\",")
 done < <(echo "$data" | grep ":")
 
 #// remove ending comma (',') character
 json=$(echo "$json" | sed 's/,$//g')
 
 json+="}"
-echo $json
+
+if [[ $arg_insert_url == 'yes' ]]; then
+  json=$(echo $json | sed 's/^{//g')
+  json=$(echo "\"Url\": \"$1\",${json}")
+  check_headers=$(echo "$json" | grep -E ",}$")
+  if [[ "${#check_headers}" -gt 0 ]]; then
+    json=$(echo "${json}" | sed 's/,}$//g')
+    json=$(echo "${json}}")
+  fi
+  json=$(echo "{${json}")
+fi
+
+echo "$json"
