@@ -1,0 +1,124 @@
+#!/bin/bash
+# lsfile - list files in compressed files
+# by AngelD
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "List Compressed File - list files in compressed files"
+  echo "Usage: 'lsfile (<file>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_show_file_info=$(echo 'no')
+arg_show_command=$(echo 'no')
+arg_find=$(echo 'no')
+find_in="."
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-i' == "${arg}" || '--file-info' == "${arg}" ]]; then
+    arg_show_file_info=$(echo 'yes')
+  elif [[ '-c' == "${arg}" || '--show-command' == "${arg}" ]]; then
+    arg_show_command=$(echo 'yes')
+  elif [[ '-f' == "${arg}" || '--find' == "${arg}" ]]; then
+    arg_find=$(echo 'yes')
+    if [[ "${!validx}" != -* && "${!validx}" != "" ]]; then
+      find_in="${!validx}"
+    fi
+  fi
+done
+
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "List Compressed File - list files in compressed files"
+  echo "Usage: 'lsfile (<file>) [options]'"
+  echo "  -i, --info           Show file information"
+  echo "  -c, --command        Show the command instead of executing it"
+  echo "  -f, --find [<dir>]   List compressed files using find"
+  exit
+fi
+
+if [[ $arg_find == 'yes' ]]; then
+  find "$find_in" -type f | grep -E "\.zip$|\.tar.gz$|\.tgz$|\.gz$|\.tar$|\.7z$|\.cab$"
+  exit
+fi
+
+if [[ -p /dev/stdin ]]; then
+  files=$(cat "/dev/stdin")
+else
+  files=$(echo "$1")
+fi
+
+
+for file in $files;do
+  file_name=$(echo "$file")
+  file_dir="./"
+
+  check_path=$(echo "$file" | grep -E "\/")
+  if [[ "${#check_path}" -gt 0 ]]; then
+    file_ext=$(echo "$file" | rev | cut -d/ -f 1 | rev | cut -d. -f 2- | sed 's/^/\./g')
+    file_name=$(echo "$file" | rev | cut -d/ -f 1 | rev)
+    file_dir=$(echo $file | rev | cut -d/ -f 2- | rev | sed 's/$/\//g')
+  else
+    file_ext=$(echo "$file" | cut -d. -f 2- | sed 's/^/\./g')
+  fi
+
+  if [[ $arg_show_file_info == 'yes' ]]; then
+    file "$file"
+    continue
+  fi
+
+  file_type=$(file "$file")
+  type_zip=$(echo "$file_type" | grep ".zip: Zip archive data,")
+  type_tar_gz=$(echo "$file_type" | grep ".tar.gz: gzip compressed data,")
+  type_tgz=$(echo "$file_type" | grep ".tgz: gzip compressed data,")
+  type_gz=$(echo "$file_type" | grep ".gz: gzip compressed data," | grep -v ".tar.gz: gzip compressed data,")
+  type_tar=$(echo "$file_type" | grep ".tar: POSIX tar archive")
+  type_7z=$(echo "$file_type" | grep ".7z: 7-zip archive data,")
+  type_cab=$(echo "$file_type" | grep ".cab: Microsoft Cabinet archive data,")
+  
+  if [[ "${#type_zip}" -gt 0 ]]; then
+    if [[ $arg_show_command == 'yes' ]]; then
+      echo "unzip -l $file"
+    else
+      unzip -l $file
+    fi
+  elif [[ "${#type_tar_gz}" -gt 0 || "${#type_tgz}" -gt 0 ]]; then
+    if [[ $arg_show_command == 'yes' ]]; then
+      echo "tar -tf $file"
+    else
+      tar -tf $file
+    fi
+  elif [[ "${#type_gz}" -gt 0 ]]; then
+    if [[ $arg_show_command == 'yes' ]]; then
+      echo "zcat -l $file"
+    else
+      zcat -l $file
+    fi
+  elif [[ "${#type_tar}" -gt 0 ]]; then
+    if [[ $arg_show_command == 'yes' ]]; then
+      echo "tar -tvf $file"
+    else
+      tar -tvf $file
+    fi
+  elif [[ "${#type_7z}" -gt 0 ]]; then
+    if [[ $arg_show_command == 'yes' ]]; then
+      echo "7z l $file"
+    else
+      7z l $file
+    fi
+  elif [[ "${#type_cab}" -gt 0 ]]; then
+    if [[ $arg_show_command == 'yes' ]]; then
+      echo "cabextract -l $file"
+    else
+      cabextract -l $file
+    fi
+  else
+    echo "lsfile: unknown file type -- '$file'"
+  fi
+done
