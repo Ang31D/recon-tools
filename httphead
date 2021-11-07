@@ -1,0 +1,104 @@
+#!/bin/bash
+# httphead - fetch HTTP response headers
+# by AngelD
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "HTTP Headers - fetch HTTP response headers"
+  echo "Usage: 'httphead (<url>) [options] -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+arg_follow_redirects=$(echo 'no')
+arg_follow_silent_mode=$(echo 'no')
+arg_verbose=$(echo 'no')
+arg_verbose_trace_time=$(echo 'no')
+timeout_in_seconds=10
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  elif [[ '-L' == "${arg}" || '--follow-redirect' == "${arg}" ]]; then
+    arg_follow_redirects=$(echo 'yes')
+  elif [[ '-s' == "${arg}" || '--follow-silent' == "${arg}" ]]; then
+    arg_follow_silent_mode=$(echo 'yes')
+  elif [[ '-v' == "${arg}" || '--verbose' == "${arg}" ]]; then
+    arg_verbose=$(echo 'yes')
+  elif [[ '-T' == "${arg}" || '--trace-time' == "${arg}" ]]; then
+    arg_verbose_trace_time=$(echo 'yes')
+  elif [[ '-t' == "${arg}" || '--connect-timeout' == "${arg}" ]]; then
+    timeout_in_seconds="${!validx}"
+  fi
+done
+
+#---- validate options ----
+if [[ $arg_show_help == 'no' ]]; then
+if [[ $# -gt 0 ]] && ! [[ -p /dev/stdin ]]; then
+  if [[ "$1" != "http"* ]]; then
+    echo "httphead: invalid url -- '$1'"
+    arg_show_help=$(echo 'yes')
+  fi
+fi
+fi
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "HTTP Headers - fetch HTTP response headers"
+  echo "Usage: 'httphead (<url>)' [options]"
+  echo "  -L, --follow-redirect   follow redirects."
+  echo "  -s, --follow-silent     Only show last redirect headers (requires '-L')."
+  echo "  -v, --verbose           Include 'header data'"
+  echo "  -T, --trace-time        Prepends a time stamp to each verbose line."
+  echo "  -t, --connect-timeout   Maximum time in seconds that you allow the connection to the"
+  echo "                          server to take. This only limits the connection phase, once"
+  echo "                          we have connected this option is of no more use."
+  exit
+fi
+
+if [[ -p /dev/stdin ]]; then
+  urls=$(cat "/dev/stdin")
+else
+  urls=$(echo "$1")
+fi
+
+curl_options="-s -k --connect-timeout $timeout_in_seconds"
+if [[ $arg_follow_redirects == 'yes' ]]; then
+  curl_options=$(echo "$curl_options -L")
+fi
+if [[ $arg_verbose == 'yes' ]]; then
+  curl_options=$(echo "$curl_options -v")
+  if [[ $arg_verbose_trace_time == 'yes' ]]; then
+    curl_options=$(echo "$curl_options --trace-time")
+  fi
+elif [[ $arg_verbose_trace_time == 'yes' ]]; then
+  curl_options=$(echo "$curl_options -v --trace-time")
+fi
+
+num_of_urls=$(echo "$urls" | wc -l)
+
+for url in $urls;do
+  if [[ "$num_of_urls" -gt 1 ]]; then
+    echo "[*] $url"
+  fi
+  data=$(curl $curl_options -IXGET "$url" -A '')
+
+  if [[ $arg_verbose == 'yes' || $arg_verbose_trace_time == 'yes' ]]; then
+    echo "$data"
+    continue
+  fi
+
+  if [[ $arg_follow_redirects == 'yes' ]]; then
+    if [[ $arg_follow_silent_mode == 'no' ]]; then
+      echo "$data"
+    else
+      line=$(echo "$data" | grep -n -E "^HTTP" | tail -n 1 | cut -d: -f 1)
+      echo "`echo "$data" | tail -n +${line}`"
+    fi
+    continue
+  fi
+
+  echo "$data"
+done
