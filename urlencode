@@ -1,0 +1,35 @@
+#!/bin/bash
+# urlencode - url encode string
+# by AngelD
+
+# display help banner
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Url Encode - url encode string"
+  echo "Usage: 'urlencode (<string>) -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+argidx=0 # arg index
+for arg in $@; do
+argidx=$((argidx+1)) # index of arg
+validx=$((argidx+1)) # index of arg-value (next arg)
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+ fi
+done
+
+# display help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Url Encode - url encode string"
+  echo "Usage: 'urlencode (<string>)'"
+  exit
+fi
+
+if [[ -p /dev/stdin ]]; then
+  data=$(cat "/dev/stdin")
+else
+  data=$(echo "$1")
+fi
+
+echo "$data" | jq -sRr @uri | sed 's/%0A$//g'
