@@ -32,4 +32,4 @@ else
   data=$(echo "$1")
 fi
 
-echo "$data" | jq -sRr @uri | sed 's/%0A$//g'
+echo "$data" | jq -sRr @uri | sed 's/%0A$//g' | sed 's/%0A/\n/g'
