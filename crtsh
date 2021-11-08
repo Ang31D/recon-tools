@@ -77,6 +77,7 @@ for dns in $data; do
   else
     result=$(curl -s https://crt.sh/\?q\=\%.$dns\&output\=json)
   fi
+  
   if [[ $arg_raw_json == 'yes' ]]; then
     echo "$result"
   elif [[ $arg_pretty_json == 'yes' ]]; then
