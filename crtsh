@@ -5,54 +5,104 @@
 
 # display short help
 if [[ $# == 0  && ! -p /dev/stdin ]]; then
-  echo "crt.sh - A utility for quickly searching presorted DNS names."
-  echo "Usage: 'crtsh (<domain> | -f <file> -h, --help)'"
+  echo "crtsh - utility to search for domain(s) at crt.sh (presorted DNS names)"
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'crtsh (<domain>|<companyname>) [options] -h, --help'"
   exit
 fi
 
 arg_show_help=$(echo 'no')
-arg_from_file=$(echo 'no')
-from_file=""
+arg_pretty_json=$(echo 'no')
+arg_raw_json=$(echo 'no')
+arg_parse_raw_json=$(echo 'no')
+arg_domain_by_org=$(echo 'no')
+arg_domain_and_org=$(echo 'no')
 argidx=0 # arg index
 for arg in $@; do
 argidx=$((argidx+1)) # index of arg
-validx=$((argidx+1)) # index of arg-value (next arg)
+validx=$((argidx+1)) # index of next arg-value
   if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
     arg_show_help=$(echo 'yes')
-  elif [[ '-f' == "${arg}" || '--from-file' == "${arg}" ]]; then
-    arg_from_file=$(echo 'yes')
-    from_file="${!validx}"
+  elif [[ '-p' == "${arg}" || '--pretty' == "${arg}" ]]; then
+    arg_pretty_json=$(echo 'yes')
+  elif [[ '-r' == "${arg}" || '--raw-json' == "${arg}" ]]; then
+    arg_raw_json=$(echo 'yes')
+  elif [[ '-R' == "${arg}" || '--parse-raw-json' == "${arg}" ]]; then
+    arg_parse_raw_json=$(echo 'yes')
+  elif [[ '-o' == "${arg}" || '--org' == "${arg}" ]]; then
+    arg_domain_by_org=$(echo 'yes')
+  elif [[ '-do' == "${arg}" || '--domain-org' == "${arg}" ]]; then
+    arg_domain_and_org=$(echo 'yes')
+    arg_domain_by_org=$(echo 'yes')
   fi
 done
 
-#---- validate options ----
-if [[ $arg_from_file == 'yes' ]]; then
-  if [[ ! -f "$from_file" ]]; then
-    echo "dnsgrep: file not found -- '$from_file'"
-    arg_show_help=$(echo 'yes')
-  fi
-fi
-
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
-  echo "crt.sh - A utility for quickly searching presorted DNS names."
-  echo "Usage: 'crtsh (<domain> | -f <file>)'"
-  echo '(no-option)               (default) filter on domain match, split on ","'
-  echo '  -h, --help              display this help and exit'
-  echo '  -f, --from-file <file>  file with word per line to wild-search for'
-  echo '  -d, --dns <dns>         file with dns per line'
+  echo "crtsh - utility to search for domain(s) at crt.sh (presorted DNS names)"
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'crtsh (<domain>|<company>) [options]'"
+  echo '  -o, --org               get domains by company'
+  echo '  -do, --domain-org       same as -o but appends ",<company>" to the output'
+  echo '  -r, --raw-json          output as raw-json'
+  echo '  -p, --pretty-json       output as pretty-json'
+  echo '  -R, --parse-raw-json    output domains from raw json'
   exit
 fi
 
-# read list of dns
 if [ -p /dev/stdin ]; then
   data=$(cat "/dev/stdin") # from std input (piped output)
-elif [[ $arg_from_file == 'yes' ]]; then
-  data=$(cat $from_file | grep -v '^#') # from file
 else
-  data=$(echo $1) # from input
+  data=$(echo $1) # from argument input
 fi
 
+if [[ $arg_parse_raw_json == 'yes' ]]; then
+  if [[ $arg_domain_by_org == 'yes' ]]; then
+    if [[ $arg_domain_and_org == 'yes' ]]; then
+      echo "$data" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g' | sed 's/^\*\.//g'
+    else
+      echo "$data" | jq '.[] | .common_name' | sed 's/"//g' | sed 's/^\*\.//g' | sort -uV
+    fi
+  else
+    echo "$data" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sed 's/^\*\.//g' | sort -uV
+  fi
+  exit
+fi
+
+if [[ $arg_raw_json == 'yes' ]]; then
+  dns="$data"
+  result=$(curl -s https://crt.sh/\?q\=\%.$dns\&output\=json)
+  echo "$result"
+  exit
+fi
+
+if [[ $arg_domain_by_org == 'yes' ]]; then
+  # url encode our data
+  org_name=echo "$data" | jq -sRr @uri | sed 's/%0A$//g'
+  result=$(curl -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
+  echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g'
+  exit
+fi
+
+
 for dns in $data; do
-  curl -s https://crt.sh/\?q\=\%.$dns\&output\=json | jq -r '.? | .[].name_value' | sed 's/\*\.//g' | sort -u
+  if [[ $arg_domain_by_org == 'yes' ]]; then
+    # url encode our data
+    org_name=echo "$dns" | jq -sRr @uri | sed 's/%0A$//g'
+    result=$(curl -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
+  else
+    result=$(curl -s https://crt.sh/\?q\=\%.$dns\&output\=json)
+  fi
+
+  if [[ $arg_pretty_json == 'yes' ]]; then
+    echo "$result" | jq -r
+  else
+    if [[ $arg_domain_and_org == 'yes' ]]; then
+      echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g' | sed 's/^\*\.//g'
+    elif [[ $arg_domain_by_org == 'yes' ]]; then
+      echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g'
+    else
+      echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sed 's/^\*\.//g' | sort -uV
+    fi
+  fi
 done
