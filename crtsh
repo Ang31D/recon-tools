@@ -76,19 +76,10 @@ if [[ $arg_raw_json == 'yes' ]]; then
   exit
 fi
 
-if [[ $arg_domain_by_org == 'yes' ]]; then
-  # url encode our data
-  org_name=echo "$data" | jq -sRr @uri | sed 's/%0A$//g'
-  result=$(curl -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
-  echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g'
-  exit
-fi
-
-
 for dns in $data; do
   if [[ $arg_domain_by_org == 'yes' ]]; then
     # url encode our data
-    org_name=echo "$dns" | jq -sRr @uri | sed 's/%0A$//g'
+    org_name=$(echo "$dns" | jq -sRr @uri | sed 's/%0A$//g')
     result=$(curl -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
   else
     result=$(curl -s https://crt.sh/\?q\=\%.$dns\&output\=json)
@@ -100,7 +91,7 @@ for dns in $data; do
     if [[ $arg_domain_and_org == 'yes' ]]; then
       echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g' | sed 's/^\*\.//g'
     elif [[ $arg_domain_by_org == 'yes' ]]; then
-      echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g'
+      echo "$result" | jq '.[] | {output: (.common_name)} | .output' | sed 's/"//g'
     else
       echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sed 's/^\*\.//g' | sort -uV
     fi
