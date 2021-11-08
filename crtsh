@@ -69,13 +69,6 @@ if [[ $arg_parse_raw_json == 'yes' ]]; then
   exit
 fi
 
-if [[ $arg_raw_json == 'yes' ]]; then
-  dns="$data"
-  result=$(curl -s https://crt.sh/\?q\=\%.$dns\&output\=json)
-  echo "$result"
-  exit
-fi
-
 for dns in $data; do
   if [[ $arg_domain_by_org == 'yes' ]]; then
     # url encode our data
@@ -84,8 +77,9 @@ for dns in $data; do
   else
     result=$(curl -s https://crt.sh/\?q\=\%.$dns\&output\=json)
   fi
-
-  if [[ $arg_pretty_json == 'yes' ]]; then
+  if [[ $arg_raw_json == 'yes' ]]; then
+    echo "$result"
+  elif [[ $arg_pretty_json == 'yes' ]]; then
     echo "$result" | jq -r
   else
     if [[ $arg_domain_and_org == 'yes' ]]; then
