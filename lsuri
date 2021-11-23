@@ -21,6 +21,10 @@ arg_probe=$(echo 'no')
 arg_verbose=$(echo 'no')
 arg_follow_redirects=$(echo 'no')
 arg_include_full_path=$(echo 'no')
+arg_user_agent=''
+arg_force=$(echo 'no')
+arg_force_crawling=$(echo 'no')
+arg_only_dir=$(echo 'no')
 timeout_in_seconds=10
 argidx=0 # arg index
 for arg in $@; do
@@ -38,6 +42,12 @@ validx=$((argidx+1)) # index of arg-value (next arg)
     arg_verbose=$(echo 'yes')
   elif [[ '-I' == "${arg}" || '--include-fullpath' == "${arg}" ]]; then
     arg_include_full_path=$(echo 'yes')
+  elif [[ '-A' == "${arg}" || '--user-agent' == "${arg}" ]]; then
+    arg_user_agent="${!validx}"
+  elif [[ '-f' == "${arg}" || '--force' == "${arg}" ]]; then
+    arg_force_crawling=$(echo 'yes')
+  elif [[ '-D' == "${arg}" || '--only-dir' == "${arg}" ]]; then
+    arg_only_dir=$(echo 'yes')
   elif [[ '-t' == "${arg}" || '--connect-timeout' == "${arg}" ]]; then
     timeout_in_seconds="${!validx}"
   fi
@@ -50,10 +60,13 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "(no-option)               (default) list of file/directory from current directory (uri)"
   echo "  -h, --help              display this help and exit"
   echo "  -r, --recursive         list recursive on directory it finds"
-  echo "  -I, --include-fullpath  include full-path refs, likely item icons in directory listing"
-  echo "  -p, --probe             print url if browsable, add -v for status code"
+  echo "  -I, --include-fullpath  include absolute-path refs, likely item icons in directory listing"
+  echo "  -D, --only-dir          only output directories"
+  echo "  -p, --probe             output url if browsable, add -v for status code"
   echo "  -v, --verbose           verbose output"
   echo "  -L, --follow-redirect   follow redirects"
+  echo "  -A, --user-agent        user agent to be used"
+  echo "  -f, --force-crawling    crawling instead of directory listing (does not support '-p')"
   echo "  -t, --connect-timeout   Maximum time in seconds that you allow the connection to the"
   echo "                          server to take. This only limits the connection phase, once"
   echo "                          we have connected this option is of no more use."
@@ -66,14 +79,18 @@ else
   urls=$(echo "$1")
 fi
 
-curl_options="-s -k --connect-timeout $timeout_in_seconds"
+curl_options="-s -k --connect-timeout $timeout_in_seconds -A '$arg_user_agent'"
 if [[ $arg_follow_redirects == 'yes' ]]; then
   curl_options=$(echo "$curl_options -L")
 fi
 
 for url in $urls;do
   if [[ $arg_probe == 'yes' ]]; then
-    status=$(curl $curl_options -IXGET "$url" -A '' | head -n 1)
+    # crawl not supported in probe mode
+    if [[ $arg_force_crawling == 'no' ]]; then
+      continue
+    fi
+    status=$(curl $curl_options -IXGET "$url" | head -n 1)
 
     http_status_code=$(echo "$status" | cut -d " " -f 2)
     if [[ $arg_verbose == 'yes' ]]; then
@@ -92,19 +109,23 @@ for url in $urls;do
   data=$(curl $curl_options "$url")
 
   is_index_of=$(echo "$data" | grep -E "Index of ")
-  if [[ "${#is_index_of}" -eq 0 ]]; then
+  if [[ "${#is_index_of}" -eq 0 && $arg_force_crawling == 'no' ]]; then
     if [[ $arg_verbose == 'yes' ]]; then
       echo "lsuri: 'Index of' not found -- '$url'"
     fi
     continue
   fi
 
-  uris=$(echo "$data" | urigrep  | tail -n +3 | sort -V)
+  #remove 'Parent Directory'
+  data=$(echo "$data" | grep -iv '>Parent Directory<'  2>/dev/null)
+  uris=$(echo "$data" | urigrep  | sort -V | grep -Ev "^\?|^http|^\/$|^\.\/$|^\.\.\/$")
   
-  file_list=$(echo "$uris" | grep -Ev "^\/|\/$")
-  for file_name in $file_list;do
-    echo "${url}${file_name}"
-  done
+  if [[ $arg_only_dir == 'no' ]]; then
+    file_list=$(echo "$uris" | grep -Ev "^\/|\/$")
+    for file_name in $file_list;do
+      echo "${url}${file_name}"
+    done
+  fi
 
   # skip by default the output as it's likely the item icon in the directory listing
   if [[ $arg_include_full_path == 'yes' ]]; then
@@ -116,20 +137,26 @@ for url in $urls;do
     done
   fi
 
-  dir_list=$(echo "$uris" | grep -E "\/$")
+  dir_list=$(echo "$uris" | grep -E "\/$" 2>/dev/null)
   for dir_name in $dir_list;do
     echo "${url}${dir_name}"
 
-    # recursively call the (this) script again for next directory listing
+    # recursively call the script (this) again for next directory listing
     #
     # NOTE:
     # For the recursive to work we need to pipe it to stdout due to
     # how we read the input. We first check if stdin has data and
     # if so use it as input instead of first ($1) argument.
     if [[ $arg_recusive == 'yes' ]]; then
-      #echo "${url}${dir_name}" | lsuri -r
       # lets call the script by "$0" if we rename the (script) filename
-      echo "${url}${dir_name}" | "$0" -r
+      recusive_options=$(echo "-r -A '$arg_user_agent'")
+      if [[ $arg_force_crawling == 'yes' ]]; then
+        recusive_options=$(echo "$recusive_options -f")
+      fi
+      if [[ $arg_only_dir == 'yes' ]]; then
+        recusive_options=$(echo "$recusive_options -D")
+      fi
+      echo "${url}${dir_name}" | "$0" -A "'$arg_user_agent'" "$recusive_options"
     fi
   done
 done
