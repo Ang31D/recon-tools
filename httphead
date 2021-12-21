@@ -14,6 +14,7 @@ arg_follow_redirects=$(echo 'no')
 arg_follow_silent_mode=$(echo 'no')
 arg_verbose=$(echo 'no')
 arg_verbose_trace_time=$(echo 'no')
+arg_user_agent=''
 timeout_in_seconds=10
 argidx=0 # arg index
 for arg in $@; do
@@ -31,6 +32,8 @@ validx=$((argidx+1)) # index of arg-value (next arg)
     arg_verbose_trace_time=$(echo 'yes')
   elif [[ '-t' == "${arg}" || '--connect-timeout' == "${arg}" ]]; then
     timeout_in_seconds="${!validx}"
+  elif [[ '-A' == "${arg}" || '--user-agent' == "${arg}" ]]; then
+    arg_user_agent="${!validx}"
   fi
 done
 
@@ -48,6 +51,7 @@ fi
 if [[ $arg_show_help == 'yes' ]]; then
   echo "HTTP Headers - fetch HTTP response headers"
   echo "Usage: 'httphead (<url>)' [options]"
+  echo "  -A, --user-agent        user agent to be used"
   echo "  -L, --follow-redirect   follow redirects."
   echo "  -s, --follow-silent     Only show last redirect headers (requires '-L')."
   echo "  -v, --verbose           Include 'header data'"
@@ -64,7 +68,7 @@ else
   urls=$(echo "$1")
 fi
 
-curl_options="-s -k --connect-timeout $timeout_in_seconds"
+curl_options="-s -k --connect-timeout $timeout_in_seconds -A '$arg_user_agent'"
 if [[ $arg_follow_redirects == 'yes' ]]; then
   curl_options=$(echo "$curl_options -L")
 fi
