@@ -1,0 +1,67 @@
+#!/bin/bash
+# nmapopenports - nmap OpenPorts
+# by AngelD
+
+# display short help
+if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
+  echo "Nmap OpenPorts - utility to output open ports from an nmap report."
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'nmapopenports (<file>) -h, --help'"
+  exit
+fi
+
+arg_show_help=$(echo 'no')
+for arg in $@; do
+  if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
+    arg_show_help=$(echo 'yes')
+  fi
+done
+
+
+if [[ -p /dev/stdin ]]; then
+  data=$(cat "/dev/stdin")
+elif [[ $arg_show_help == 'no' ]]; then
+  data=$(cat "$1")
+fi
+
+report_type_nmap=$(echo "$data" | grep -E "^PORT.*STATE.*SERVICE.*REASON")
+report_type_gnmap=$(echo "$data" | grep -E "^Host:.*Ports:.*\/\/")
+report_type_xml=$(echo "$data" | head -n 1 | grep -E "^<\?xml version")
+
+report_type='unkown'
+if [[ "${#report_type_nmap}" -gt 0 ]]; then
+  report_type='nmap'
+elif [[ "${#report_type_gnmap}" -gt 0 ]]; then
+  report_type='gnmap'
+elif [[ "${#report_type_xml}" -gt 0 ]]; then
+  report_type='xml'
+fi
+
+if [[ $arg_show_help == 'no' ]]; then
+  #---- validate options ----
+  if [[ $# -ne 1 ]] && ! [[ -p /dev/stdin ]]; then
+    echo "nmap-openports: invalid args"
+    arg_show_help=$(echo 'yes')
+  fi
+  if [[ $report_type == "unkown" ]]; then
+        echo "nmap-openports: unknown file format"
+        arg_show_help=$(echo 'yes')
+  fi
+fi
+
+# display full help
+if [[ $arg_show_help == 'yes' ]]; then
+  echo "Nmap OpenPorts - utility to output open ports from an nmap report."
+  echo "stdin/out support for workflow integration"
+  echo "Usage: 'nmapopenports (<file>) -h, --help'"
+  echo '  <file>              nmap report file (supports: .nmap, .gnmap, .xml)'
+  exit
+fi
+
+if [[ $report_type == "nmap" ]]; then
+  echo "$data" | grep -i open | grep -v "^#" | sed 's/\/.*//g' | tr '\n' ',' | sed 's/,$//g' | awk '{$1=$1};1'
+elif [[ $report_type == "gnmap" ]]; then
+  echo "$data" | grep -E "^Host:.*Ports:" | cut -d: -f 3- | tr ',' '\n' | sed 's/^ //g' | cut -d/ -f 1 | tr '\n' ',' | sed 's/,$//g' | xargs
+ elif [[ $report_type == "xml" ]]; then
+  echo "$data" | grep -E "<port protocol=.* state=\"open\"" | sed 's/.*portid=//g' | cut -d '"' -f 2 | tr '\n' ',' | sed 's/,$//g' | xargs
+fi
