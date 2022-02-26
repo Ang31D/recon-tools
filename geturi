@@ -15,6 +15,7 @@ if [[ $# -eq 0 && ! -p /dev/stdin ]]; then
 fi
 
 arg_show_help=$(echo 'no')
+arg_user_agent=''
 timeout_in_seconds=10
 argidx=0 # arg index
 for arg in $@; do
@@ -22,6 +23,8 @@ argidx=$((argidx+1)) # index of arg
 validx=$((argidx+1)) # index of arg-value (next arg)
   if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
     arg_show_help=$(echo 'yes')
+  elif [[ '-A' == "${arg}" || '--user-agent' == "${arg}" ]]; then
+    arg_user_agent="${!validx}"
   elif [[ '-t' == "${arg}" || '--connect-timeout' == "${arg}" ]]; then
     timeout_in_seconds="${!validx}"
   fi
@@ -31,6 +34,7 @@ done
 if [[ $arg_show_help == 'yes' ]]; then
   echo "Get Uri - download uri as host[:port]/path"
   echo "Usage: 'lsuri (<uri>) [options]'"
+  echo "  -A, --user-agent        user agent to be used"
   echo "  -t, --connect-timeout   Maximum time in seconds that you allow the connection to the"
   echo "                          server to take. This only limits the connection phase, once"
   echo "                          we have connected this option is of no more use."
@@ -59,5 +63,5 @@ for url in $urls;do
   fi
 
   echo "$pre_out_dir/$out_file"
-  curl -k -s --connect-timeout $timeout_in_seconds "$url" -o "$pre_out_dir/$out_file"
+  curl -k -s --connect-timeout $timeout_in_seconds -A '$arg_user_agent' "$url" -o "$pre_out_dir/$out_file"
 done
