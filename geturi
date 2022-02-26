@@ -33,7 +33,7 @@ done
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
   echo "Get Uri - download uri as host[:port]/path"
-  echo "Usage: 'lsuri (<uri>) [options]'"
+  echo "Usage: 'geturi (<uri>) [options]'"
   echo "  -A, --user-agent        user agent to be used"
   echo "  -t, --connect-timeout   Maximum time in seconds that you allow the connection to the"
   echo "                          server to take. This only limits the connection phase, once"
