@@ -12,28 +12,44 @@ if [[ $# == 0  && ! -p /dev/stdin ]]; then
 fi
 
 arg_show_help=$(echo 'no')
-arg_pretty_json=$(echo 'no')
-arg_raw_json=$(echo 'no')
+arg_match_on_domain_tld=$(echo 'no')
+arg_match_on_common_name=$(echo 'no')
+arg_match_on_dns_name=$(echo 'no')
+arg_match_domain_by_org=$(echo 'no')
+arg_match_on_domain_and_org=$(echo 'no')
+arg_out_strip_wildcard=$(echo 'no')
+arg_out_pretty_json=$(echo 'no')
+arg_out_raw_json=$(echo 'no')
+arg_out_raw_json_as_stream=$(echo 'no')
 arg_parse_raw_json=$(echo 'no')
-arg_domain_by_org=$(echo 'no')
-arg_domain_and_org=$(echo 'no')
+#sed 's/^\[//g' | sed 's/\]$//g' | sed 's/},{/}\n{/g'
 argidx=0 # arg index
 for arg in $@; do
 argidx=$((argidx+1)) # index of arg
 validx=$((argidx+1)) # index of next arg-value
   if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
     arg_show_help=$(echo 'yes')
-  elif [[ '-p' == "${arg}" || '--pretty' == "${arg}" ]]; then
-    arg_pretty_json=$(echo 'yes')
-  elif [[ '-r' == "${arg}" || '--raw-json' == "${arg}" ]]; then
-    arg_raw_json=$(echo 'yes')
-  elif [[ '-R' == "${arg}" || '--parse-raw-json' == "${arg}" ]]; then
-    arg_parse_raw_json=$(echo 'yes')
+  elif [[ '--tld' == "${arg}" ]]; then
+    arg_match_on_domain_tld=$(echo 'yes')
+  elif [[ '--cn' == "${arg}" ]]; then
+    arg_match_on_common_name=$(echo 'yes')
+  elif [[ '--dns' == "${arg}" ]]; then
+    arg_match_on_dns_name=$(echo 'yes')
   elif [[ '-o' == "${arg}" || '--org' == "${arg}" ]]; then
-    arg_domain_by_org=$(echo 'yes')
+    arg_match_domain_by_org=$(echo 'yes')
   elif [[ '-do' == "${arg}" || '--domain-org' == "${arg}" ]]; then
-    arg_domain_and_org=$(echo 'yes')
-    arg_domain_by_org=$(echo 'yes')
+    arg_match_on_domain_and_org=$(echo 'yes')
+    arg_match_domain_by_org=$(echo 'yes')
+  elif [[ '-w' == "${arg}" || '--strip-wildcard' == "${arg}" ]]; then
+    arg_out_strip_wildcard=$(echo 'yes')
+  elif [[ '-p' == "${arg}" || '--pretty' == "${arg}" ]]; then
+    arg_out_pretty_json=$(echo 'yes')
+  elif [[ '-r' == "${arg}" || '--raw-json' == "${arg}" ]]; then
+    arg_out_raw_json=$(echo 'yes')
+  elif [[ '-s' == "${arg}" || '--raw-json' == "${arg}" ]]; then
+    arg_out_raw_json_as_stream=$(echo 'yes')
+  elif [[ '-J' == "${arg}" || '--parse-raw-json' == "${arg}" ]]; then
+    arg_parse_raw_json=$(echo 'yes')
   fi
 done
 
@@ -42,53 +58,88 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "crtsh - utility to search for domain(s) at crt.sh (presorted DNS names)"
   echo "stdin/out support for workflow integration"
   echo "Usage: 'crtsh (<domain>|<company>) [options]'"
+  echo "  query:"
+  echo "  --tld                   matching on domain tld ('<domain>.*' instead of '*.<domain>')"
+  echo '  --cn                    match on subject common name (ssl.cert.subject.CN)'
+  echo '  --dns                   match on subject dns name (ssl.cert.subject alternative name)'
   echo '  -o, --org               get domains by company'
   echo '  -do, --domain-org       same as -o but appends ",<company>" to the output'
-  echo '  -r, --raw-json          output as raw-json'
-  echo '  -p, --pretty-json       output as pretty-json'
-  echo '  -R, --parse-raw-json    output domains from raw json'
+  echo "  output:"
+  echo '                            default output domains if omitting: -p, -r, -s'
+  echo '    -w, --strip-wildcard    strip wildcard (*.) from domain results'
+  echo '    -p, --pretty-json       output as pretty-json'
+  echo '    -r, --raw-json          output as raw-json'
+  echo '    -s, --json-stream       output one json blob per line'
+  echo "  input:"
+  echo "    -J, --input-raw-json    stdin format is raw json (from previous '-r' output)"
   exit
 fi
 
 if [ -p /dev/stdin ]; then
-  data=$(cat "/dev/stdin") # from std input (piped output)
+  data=$(cat "/dev/stdin") # from std input
 else
   data=$(echo $1) # from argument input
 fi
 
 if [[ $arg_parse_raw_json == 'yes' ]]; then
-  if [[ $arg_domain_by_org == 'yes' ]]; then
-    if [[ $arg_domain_and_org == 'yes' ]]; then
-      echo "$data" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g' | sed 's/^\*\.//g'
+  if [[ $arg_out_pretty_json == 'yes' ]]; then
+    echo "$data" | jq -r
+    exit
+  elif [[ $arg_out_raw_json_as_stream == 'yes' ]]; then
+    echo "$data" | jq -r -c  '.[]'
+    exit
+  elif [[ $arg_match_domain_by_org == 'yes' ]]; then
+    results=""
+    if [[ $arg_match_on_domain_and_org == 'yes' ]]; then
+      results=$(echo "$data" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g')
     else
-      echo "$data" | jq '.[] | .common_name' | sed 's/"//g' | sed 's/^\*\.//g' | sort -uV
+      results=$(echo "$data" | jq '.[] | .common_name' | sed 's/"//g')
     fi
   else
-    echo "$data" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sed 's/^\*\.//g' | sort -uV
+    results=$(echo "$data" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n')
+  fi
+  if [[ $arg_out_strip_wildcard == 'yes' ]]; then
+    echo "$results" | sed 's/^\*\.//g' | sort -uV
+  else
+    echo "$results" | sort -uV
   fi
   exit
 fi
 
-for dns in $data; do
-  if [[ $arg_domain_by_org == 'yes' ]]; then
+for query_value in $data; do
+  if [[ $arg_match_domain_by_org == 'yes' ]]; then
     # url encode our data
-    org_name=$(echo "$dns" | jq -sRr @uri | sed 's/%0A$//g')
+    org_name=$(echo "$query_value" | jq -sRr @uri | sed 's/%0A$//g')
     result=$(curl -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
+  elif [[ $arg_match_on_common_name == 'yes' ]]; then
+    result=$(curl -s https://crt.sh/\?CN\=$query_value\&output\=json)
+  elif [[ $arg_match_on_dns_name == 'yes' ]]; then
+    result=$(curl -s https://crt.sh/\?dNSName\=$query_value\&output\=json)
+  elif [[ $arg_match_on_domain_tld == 'yes' ]]; then
+    result=$(curl -s https://crt.sh/\?q\=$query_value\%\&output\=json)
   else
-    result=$(curl -s https://crt.sh/\?q\=\%.$dns\&output\=json)
+    result=$(curl -s https://crt.sh/\?q\=\%.$query_value\&output\=json)
   fi
   
-  if [[ $arg_raw_json == 'yes' ]]; then
-    echo "$result"
-  elif [[ $arg_pretty_json == 'yes' ]]; then
+  if [[ $arg_out_pretty_json == 'yes' ]]; then
     echo "$result" | jq -r
+  elif [[ $arg_out_raw_json_as_stream == 'yes' ]]; then
+    echo "$result" | jq -r -c  '.[]'
+  elif [[ $arg_out_raw_json == 'yes' ]]; then
+    echo "$result"
   else
-    if [[ $arg_domain_and_org == 'yes' ]]; then
-      echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g' | sed 's/^\*\.//g'
-    elif [[ $arg_domain_by_org == 'yes' ]]; then
-      echo "$result" | jq '.[] | {output: (.common_name)} | .output' | sed 's/"//g'
+    results=""
+    if [[ $arg_match_on_domain_and_org == 'yes' ]]; then
+      results=$(echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g')
+    elif [[ $arg_match_domain_by_org == 'yes' ]]; then
+      results=$(echo "$result" | jq '.[] | {output: (.common_name)} | .output' | sed 's/"//g')
     else
-      echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sed 's/^\*\.//g' | sort -uV
+      results=$(echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sort -uV)
+    fi
+    if [[ $arg_out_strip_wildcard == 'yes' ]]; then
+      echo "$results" | sed 's/^\*\.//g' | sort -uV
+    else
+      echo "$results" | sort -uV
     fi
   fi
 done
