@@ -22,7 +22,6 @@ arg_out_pretty_json=$(echo 'no')
 arg_out_raw_json=$(echo 'no')
 arg_out_raw_json_as_stream=$(echo 'no')
 arg_parse_raw_json=$(echo 'no')
-#sed 's/^\[//g' | sed 's/\]$//g' | sed 's/},{/}\n{/g'
 argidx=0 # arg index
 for arg in $@; do
 argidx=$((argidx+1)) # index of arg
