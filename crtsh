@@ -59,7 +59,7 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "stdin/out support for workflow integration"
   echo "Usage: 'crtsh (<domain>|<company>) [options]'"
   echo "  query:"
-  echo "  --tld                   matching on domain tld ('<domain>.*' instead of '*.<domain>')"
+  echo "  --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')"
   echo '  --cn                    match on subject common name (ssl.cert.subject.CN)'
   echo '  --dns                   match on subject dns name (ssl.cert.subject alternative name)'
   echo '  -o, --org               get domains by company'
@@ -82,7 +82,10 @@ else
 fi
 
 if [[ $arg_parse_raw_json == 'yes' ]]; then
-  if [[ $arg_out_pretty_json == 'yes' ]]; then
+  if [[ $arg_out_raw_json == 'yes' ]]; then
+    echo "$data"
+    exit
+  elif [[ $arg_out_pretty_json == 'yes' ]]; then
     echo "$data" | jq -r
     exit
   elif [[ $arg_out_raw_json_as_stream == 'yes' ]]; then
@@ -110,15 +113,15 @@ for query_value in $data; do
   if [[ $arg_match_domain_by_org == 'yes' ]]; then
     # url encode our data
     org_name=$(echo "$query_value" | jq -sRr @uri | sed 's/%0A$//g')
-    result=$(curl -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
+    result=$(curl -A Chrome -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
   elif [[ $arg_match_on_common_name == 'yes' ]]; then
-    result=$(curl -s https://crt.sh/\?CN\=$query_value\&output\=json)
+    result=$(curl -A Chrome -s https://crt.sh/\?CN\=$query_value\&output\=json)
   elif [[ $arg_match_on_dns_name == 'yes' ]]; then
-    result=$(curl -s https://crt.sh/\?dNSName\=$query_value\&output\=json)
+    result=$(curl -A Chrome -s https://crt.sh/\?dNSName\=$query_value\&output\=json)
   elif [[ $arg_match_on_domain_tld == 'yes' ]]; then
-    result=$(curl -s https://crt.sh/\?q\=$query_value\%\&output\=json)
+    result=$(curl -A Chrome -s https://crt.sh/\?q\=$query_value\%\&output\=json)
   else
-    result=$(curl -s https://crt.sh/\?q\=\%.$query_value\&output\=json)
+    result=$(curl -A Chrome -s https://crt.sh/\?q\=\%.$query_value\&output\=json)
   fi
   
   if [[ $arg_out_pretty_json == 'yes' ]]; then
