@@ -8,7 +8,23 @@ All tools should also support stdin/out for workflow integration.
 ## example usage
 
 ### crtsh - A utility for quickly searching presorted DNS names.
-```Usage: 'crtsh (<domain> | -f <file> -h, --help)'```
+```
+Usage: 'crtsh (<domain>|<company>) [options]'
+  query:
+  --tld                   matching on domain tld ('<domain>.*' instead of '*.<domain>')
+  --cn                    match on common name (ssl.cert.subject.CN)
+  --dns                   match on dns name (ssl.cert.subject alternative name)
+  -o, --org               get domains by company
+  -do, --domain-org       same as -o but appends ",<company>" to the output
+  output:
+                            default output domains if omitting: -p, -r, -s
+    -w, --strip-wildcard    strip wildcard (*.) from domain results
+    -p, --pretty-json       output as pretty-json
+    -r, --raw-json          output as raw-json
+    -s, --json-stream       output one json blob per line
+  input:
+    -J, --input-raw-json    stdin format is raw json (from previous '-r' output)
+```
 * fetch google subdomains containing 'api'
 
 ```crtsh %25api%25.google.com```
