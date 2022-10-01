@@ -11,7 +11,7 @@ All tools should also support stdin/out for workflow integration.
 ```
 Usage: 'crtsh (<domain>|<company>) [options]'
   query:
-  --tld                   matching on domain tld ('<domain>.*' instead of '*.<domain>')
+  --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')
   --cn                    match on common name (ssl.cert.subject.CN)
   --dns                   match on dns name (ssl.cert.subject alternative name)
   -o, --org               get domains by company
