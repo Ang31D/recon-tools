@@ -56,7 +56,27 @@ Usage: 'crtsh (<domain>|<company>) [options]'
 ```dnsgrep google.com -L -F | grepip -v```
 
 ### hostprobe - A utility for quickly see if a dns/host exists.
-```Usage: 'hostprobe (<dns> | -f <file>) [options] -h, --help'```
+```
+stdin/out support for workflow integration
+Usage: 'hostprobe (<host>) [options]'
+  <host>                   the host (domain|ipv4|ipv6) to lookup
+  -s, --dns-server         dns server to query (optional)
+  -t, --type               specifies the query type (optional), ex. CNAME, NS, SOA, TXT, DNSKEY, AXFR, etc.
+  -n, --not-found          only output hosts not found
+  -A, --allow-ip           allow probing ip-address
+  -r, --raw                outputs the raw results (supports -N, -v)
+  -N, --exclude-not-found  exclude hosts not found, requires -r
+  -F, --filter             TO IMPLEMENT: filter raw output (requires -r)
+  -x, --resolve            resolve host (supports -f)
+  -f --format              outputs "<host> <resolved host,...>" (requires -x)
+  -E, --extract-metadata   extract dns/ip (supports -f)
+  -v, --verbose            verbose output
+  -vv                      extra verbose output
+  -mD, --meta-domain       append ,<domain> for ip
+  -m <d,i,m|all>, --meta <d,i,m|all> append ,Alias for domain ,Domain for ip, Ip for domain, Mail or All
+    meta options
+    d, domain-alias        return string containing 'is an alias for'
+```
 * output alive (sub-)domains listed in the file
 
 ```hostprobe www.sites.google.com```
