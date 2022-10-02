@@ -77,7 +77,13 @@ fi
 if [ -p /dev/stdin ]; then
   data=$(cat "/dev/stdin") # from std input
 else
-  data=$(echo $1) # from argument input
+  data=$(echo "$1") # from argument input
+fi
+
+if [[ $arg_match_domain_by_org == 'yes' ]]; then
+  # url encode our input data - 
+  # replace ' ' = '+', '(' = '%28', ')' = '%29'
+  data=$(echo "$data" | sed 's/ /+/g' | sed 's/(/%28/g' | sed 's/)/%29/g')
 fi
 
 if [[ $arg_parse_raw_json == 'yes' ]]; then
@@ -110,9 +116,7 @@ fi
 
 for query_value in $data; do
   if [[ $arg_match_domain_by_org == 'yes' ]]; then
-    # url encode our data
-    org_name=$(echo "$query_value" | jq -sRr @uri | sed 's/%0A$//g')
-    result=$(curl -A Chrome -s https://crt.sh/\?o\=\%.$org_name\&output\=json)
+    result=$(curl -A Chrome -s https://crt.sh/\?o\=\%.$query_value\&output\=json)
   elif [[ $arg_match_on_common_name == 'yes' ]]; then
     result=$(curl -A Chrome -s https://crt.sh/\?CN\=$query_value\&output\=json)
   elif [[ $arg_match_on_dns_name == 'yes' ]]; then
