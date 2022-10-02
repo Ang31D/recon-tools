@@ -9,20 +9,26 @@ All tools should also support stdin/out for workflow integration.
 
 ### crtsh - A utility for quickly searching presorted DNS names.
 ```
+stdin/out support for workflow integration
 Usage: 'crtsh (<domain>|<company>) [options]'
   query:
   --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')
-  --cn                    match on subject common name (ssl.cert.subject.CN)
-  --dns                   match on subject dns name (ssl.cert.subject alternative name)
-  -o, --org               get domains by company
-  -do, --domain-org       same as -o but appends ",<company>" to the output
+                          hint: useful when finding root or 3rd-party domains
+  --cn                    match on common name (Subject commonName)
+  --dns                   match on dns (Subject Alternative Name)
+  --org                   match on company (Subject organizationName)
 
   output:
     default output domains if omitting: -p, -r or -s
+    -a, --append            append ',<name_value>' to <common_name>,
+                            with '--org' <name_value> will be the <company>,
+                            with '--cn' <common_name> does not exist, will only output <name_value>
+    -A, --Append            append ',<common_name>' to <name_value>,
     -w, --strip-wildcard    strip wildcard (*.) from domain results
     -p, --pretty-json       output as pretty-json
     -r, --raw-json          output as raw-json
     -s, --json-stream       output one json blob per line
+                            hint: useful when looking at the result format or stdin/out workflow
 
   input:
     -J, --input-raw-json    stdin format is raw json (from previous '-r' output)
