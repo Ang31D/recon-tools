@@ -63,12 +63,14 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo '  --dns                   match on subject dns name (ssl.cert.subject alternative name)'
   echo '  -o, --org               get domains by company'
   echo '  -do, --domain-org       same as -o but appends ",<company>" to the output'
+  echo ''
   echo "  output:"
-  echo '                            default output domains if omitting: -p, -r, -s'
+  echo '    default output domains if omitting: -p, -r or -s'
   echo '    -w, --strip-wildcard    strip wildcard (*.) from domain results'
   echo '    -p, --pretty-json       output as pretty-json'
   echo '    -r, --raw-json          output as raw-json'
   echo '    -s, --json-stream       output one json blob per line'
+  echo ''
   echo "  input:"
   echo "    -J, --input-raw-json    stdin format is raw json (from previous '-r' output)"
   exit
