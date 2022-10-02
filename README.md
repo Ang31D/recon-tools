@@ -12,6 +12,7 @@ All tools should also support stdin/out for workflow integration.
 stdin/out support for workflow integration
 Usage: 'crtsh (<domain>|<company>) [options]'
   query:
+    default query sub-domains if omitting: -tld, -cn, --dns or --org
   --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')
                           hint: useful when finding root or 3rd-party domains
   --cn                    match on common name (Subject commonName)
@@ -20,18 +21,18 @@ Usage: 'crtsh (<domain>|<company>) [options]'
 
   output:
     default output domains if omitting: -p, -r or -s
+    -w, --strip-wildcard    strip wildcard ('*.') from dynamic dns name results
     -a, --append            append ',<name_value>' to <common_name>,
                             with '--org' <name_value> will be the <company>,
                             with '--cn' <common_name> does not exist, will only output <name_value>
-    -A, --Append            append ',<common_name>' to <name_value>,
-    -w, --strip-wildcard    strip wildcard (*.) from domain results
+    -A, --rev-append        reverse append ',<common_name>' to <name_value>,
     -p, --pretty-json       output as pretty-json
     -r, --raw-json          output as raw-json
     -s, --json-stream       output one json blob per line
                             hint: useful when looking at the result format or stdin/out workflow
 
   input:
-    -J, --input-raw-json    stdin format is raw json (from previous '-r' output)
+    -J, --json-input        stdin is raw json (from previous '-r' output)
 ```
 * fetch google subdomains containing 'api'
 
