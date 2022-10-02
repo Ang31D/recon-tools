@@ -72,7 +72,7 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "    -a, --append            append ',<name_value>' to <common_name>,"
   echo "                            with '--org' <name_value> will be the <company>,"
   echo "                            with '--cn' <common_name> does not exist, will only output <name_value>"
-  echo "    -A, --Append            append ',<common_name>' to <name_value>,"
+  echo "    -A, --rev-append        reverse append ',<common_name>' to <name_value>,"
   echo '    -w, --strip-wildcard    strip wildcard (*.) from domain results'
   echo '    -p, --pretty-json       output as pretty-json'
   echo '    -r, --raw-json          output as raw-json'
