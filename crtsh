@@ -61,6 +61,7 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "stdin/out support for workflow integration"
   echo "Usage: 'crtsh (<domain>|<company>) [options]'"
   echo "  query:"
+  echo '    default query sub-domains if omitting: -tld, -cn, --dns or --org'
   echo "  --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')"
   echo "                          hint: useful when finding root or 3rd-party domains"
   echo '  --cn                    match on common name (Subject commonName)'
@@ -69,18 +70,18 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo ''
   echo "  output:"
   echo '    default output domains if omitting: -p, -r or -s'
+  echo "    -w, --strip-wildcard    strip wildcard ('*.') from dynamic dns name results"
   echo "    -a, --append            append ',<name_value>' to <common_name>,"
   echo "                            with '--org' <name_value> will be the <company>,"
   echo "                            with '--cn' <common_name> does not exist, will only output <name_value>"
   echo "    -A, --rev-append        reverse append ',<common_name>' to <name_value>,"
-  echo '    -w, --strip-wildcard    strip wildcard (*.) from domain results'
   echo '    -p, --pretty-json       output as pretty-json'
   echo '    -r, --raw-json          output as raw-json'
   echo '    -s, --json-stream       output one json blob per line'
   echo "                            hint: useful when looking at the result format or stdin/out workflow"
   echo ''
   echo "  input:"
-  echo "    -J, --input-raw-json    stdin format is raw json (from previous '-r' output)"
+  echo "    -J, --json-input        stdin is raw json (from previous '-r' output)"
   exit
 fi
 
