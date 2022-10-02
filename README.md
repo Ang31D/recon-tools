@@ -12,16 +12,18 @@ All tools should also support stdin/out for workflow integration.
 Usage: 'crtsh (<domain>|<company>) [options]'
   query:
   --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')
-  --cn                    match on common name (ssl.cert.subject.CN)
-  --dns                   match on dns name (ssl.cert.subject alternative name)
+  --cn                    match on subject common name (ssl.cert.subject.CN)
+  --dns                   match on subject dns name (ssl.cert.subject alternative name)
   -o, --org               get domains by company
   -do, --domain-org       same as -o but appends ",<company>" to the output
+
   output:
-                            default output domains if omitting: -p, -r, -s
+    default output domains if omitting: -p, -r or -s
     -w, --strip-wildcard    strip wildcard (*.) from domain results
     -p, --pretty-json       output as pretty-json
     -r, --raw-json          output as raw-json
     -s, --json-stream       output one json blob per line
+
   input:
     -J, --input-raw-json    stdin format is raw json (from previous '-r' output)
 ```
