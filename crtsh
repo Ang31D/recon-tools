@@ -12,11 +12,12 @@ if [[ $# == 0  && ! -p /dev/stdin ]]; then
 fi
 
 arg_show_help=$(echo 'no')
-arg_match_on_domain_tld=$(echo 'no')
+arg_match_on_any_domain_tld=$(echo 'no')
 arg_match_on_common_name=$(echo 'no')
 arg_match_on_dns_name=$(echo 'no')
 arg_match_domain_by_org=$(echo 'no')
-arg_match_on_domain_and_org=$(echo 'no')
+arg_out_append=$(echo 'no')
+arg_out_reversed_append=$(echo 'no')
 arg_out_strip_wildcard=$(echo 'no')
 arg_out_pretty_json=$(echo 'no')
 arg_out_raw_json=$(echo 'no')
@@ -29,16 +30,18 @@ validx=$((argidx+1)) # index of next arg-value
   if [[ '-h' == "${arg}" || '--help' == "${arg}" ]]; then
     arg_show_help=$(echo 'yes')
   elif [[ '--tld' == "${arg}" ]]; then
-    arg_match_on_domain_tld=$(echo 'yes')
+    arg_match_on_any_domain_tld=$(echo 'yes')
   elif [[ '--cn' == "${arg}" ]]; then
     arg_match_on_common_name=$(echo 'yes')
   elif [[ '--dns' == "${arg}" ]]; then
     arg_match_on_dns_name=$(echo 'yes')
   elif [[ '-o' == "${arg}" || '--org' == "${arg}" ]]; then
     arg_match_domain_by_org=$(echo 'yes')
-  elif [[ '-do' == "${arg}" || '--domain-org' == "${arg}" ]]; then
-    arg_match_on_domain_and_org=$(echo 'yes')
-    arg_match_domain_by_org=$(echo 'yes')
+  elif [[ '-a' == "${arg}" || '--append' == "${arg}" ]]; then
+    arg_out_append=$(echo 'yes')
+  elif [[ '-A' == "${arg}" || '--rev-append' == "${arg}" ]]; then
+    arg_out_reversed_append=$(echo 'yes')
+    arg_out_append=$(echo 'yes')
   elif [[ '-w' == "${arg}" || '--strip-wildcard' == "${arg}" ]]; then
     arg_out_strip_wildcard=$(echo 'yes')
   elif [[ '-p' == "${arg}" || '--pretty' == "${arg}" ]]; then
@@ -59,17 +62,22 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "Usage: 'crtsh (<domain>|<company>) [options]'"
   echo "  query:"
   echo "  --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')"
-  echo '  --cn                    match on subject common name (ssl.cert.subject.CN)'
-  echo '  --dns                   match on subject dns name (ssl.cert.subject alternative name)'
-  echo '  -o, --org               get domains by company'
-  echo '  -do, --domain-org       same as -o but appends ",<company>" to the output'
+  echo "                          hint: useful when finding root or 3rd-party domains"
+  echo '  --cn                    match on common name (Subject commonName)'
+  echo '  --dns                   match on dns (Subject Alternative Name)'
+  echo '  --org                   match on company (Subject organizationName)'
   echo ''
   echo "  output:"
   echo '    default output domains if omitting: -p, -r or -s'
+  echo "    -a, --append            append ',<name_value>' to <common_name>,"
+  echo "                            with '--org' <name_value> will be the <company>,"
+  echo "                            with '--cn' <common_name> does not exist, will only output <name_value>"
+  echo "    -A, --Append            append ',<common_name>' to <name_value>,"
   echo '    -w, --strip-wildcard    strip wildcard (*.) from domain results'
   echo '    -p, --pretty-json       output as pretty-json'
   echo '    -r, --raw-json          output as raw-json'
   echo '    -s, --json-stream       output one json blob per line'
+  echo "                            hint: useful when looking at the result format or stdin/out workflow"
   echo ''
   echo "  input:"
   echo "    -J, --input-raw-json    stdin format is raw json (from previous '-r' output)"
@@ -82,34 +90,52 @@ else
   data=$(echo "$1") # from argument input
 fi
 
-if [[ $arg_match_domain_by_org == 'yes' ]]; then
+if [[ $arg_match_domain_by_org == 'yes' && $arg_parse_raw_json == 'no' ]]; then
   # url encode our input data - 
-  # replace ' ' = '+', '(' = '%28', ')' = '%29'
+  # char encoding: ' ' = '+', '(' = '%28', ')' = '%29'
   data=$(echo "$data" | sed 's/ /+/g' | sed 's/(/%28/g' | sed 's/)/%29/g')
 fi
 
 if [[ $arg_parse_raw_json == 'yes' ]]; then
-  if [[ $arg_out_raw_json == 'yes' ]]; then
-    echo "$data"
-    exit
-  elif [[ $arg_out_pretty_json == 'yes' ]]; then
+  if [[ $arg_out_pretty_json == 'yes' ]]; then
     echo "$data" | jq -r
+    exit
+  elif [[ $arg_out_raw_json == 'yes' ]]; then
+    echo "$data"
     exit
   elif [[ $arg_out_raw_json_as_stream == 'yes' ]]; then
     echo "$data" | jq -r -c  '.[]'
     exit
-  elif [[ $arg_match_domain_by_org == 'yes' ]]; then
+  fi
+
+  if [[ $arg_match_domain_by_org == 'yes' ]]; then
     results=""
-    if [[ $arg_match_on_domain_and_org == 'yes' ]]; then
-      results=$(echo "$data" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g')
+    if [[ $arg_out_append == 'yes' ]]; then
+      if [[ $arg_out_reversed_append == 'yes' ]]; then
+        results=$(echo "$data" | jq -r '.[] | {output: (.name_value + "," + .common_name)} | .output')
+      else
+        results=$(echo "$data" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output')
+      fi
     else
-      results=$(echo "$data" | jq '.[] | .common_name' | sed 's/"//g')
+      results=$(echo "$data" | jq -r '.[] | .common_name')
     fi
+
+  elif [[ $arg_match_on_common_name == 'yes' ]]; then
+    results=$(echo "$data" | jq -r '.[] | {output: (.name_value)} | .output')
+
   else
-    results=$(echo "$data" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n')
+    if [[ $arg_out_append == 'yes' ]]; then
+      if [[ $arg_out_reversed_append == 'yes' ]]; then
+        results=$(echo "$data" | jq -r '.? | .[] | "\(.name_value),\(.common_name)"')
+      else
+        results=$(echo "$data" | jq -r '.? | .[] | "\(.common_name),\(.name_value)"')
+      fi
+    else
+      results=$(echo "$data" | jq -r '.? | .[] | "\(.common_name) \(.name_value)"' | tr ' ' '\n')
+    fi
   fi
   if [[ $arg_out_strip_wildcard == 'yes' ]]; then
-    echo "$results" | sed 's/^\*\.//g' | sort -uV
+    echo "$results" | sed 's/\*\.//g' | sort -uV
   else
     echo "$results" | sort -uV
   fi
@@ -117,14 +143,14 @@ if [[ $arg_parse_raw_json == 'yes' ]]; then
 fi
 
 for query_value in $data; do
-  if [[ $arg_match_domain_by_org == 'yes' ]]; then
-    result=$(curl -A Chrome -s https://crt.sh/\?o\=\%.$query_value\&output\=json)
+  if [[ $arg_match_on_any_domain_tld == 'yes' ]]; then
+    result=$(curl -A Chrome -s https://crt.sh/\?q\=$query_value\%\&output\=json)
   elif [[ $arg_match_on_common_name == 'yes' ]]; then
     result=$(curl -A Chrome -s https://crt.sh/\?CN\=$query_value\&output\=json)
   elif [[ $arg_match_on_dns_name == 'yes' ]]; then
     result=$(curl -A Chrome -s https://crt.sh/\?dNSName\=$query_value\&output\=json)
-  elif [[ $arg_match_on_domain_tld == 'yes' ]]; then
-    result=$(curl -A Chrome -s https://crt.sh/\?q\=$query_value\%\&output\=json)
+  elif [[ $arg_match_domain_by_org == 'yes' ]]; then
+    result=$(curl -A Chrome -s https://crt.sh/\?o\=\%.$query_value\&output\=json)
   else
     result=$(curl -A Chrome -s https://crt.sh/\?q\=\%.$query_value\&output\=json)
   fi
@@ -136,16 +162,49 @@ for query_value in $data; do
   elif [[ $arg_out_raw_json == 'yes' ]]; then
     echo "$result"
   else
-    results=""
-    if [[ $arg_match_on_domain_and_org == 'yes' ]]; then
-      results=$(echo "$result" | jq '.[] | {output: (.common_name + "," + .name_value)} | .output' | sed 's/"//g')
+
+    if [[ $arg_match_on_any_domain_tld == 'yes' ]]; then
+      if [[ $arg_out_append == 'yes' ]]; then
+        if [[ $arg_out_reversed_append == 'yes' ]]; then
+          results=$(echo "$result" | jq -r '.[] | {output: (.name_value + "," + .common_name)} | .output')
+        else
+          results=$(echo "$result" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output')
+        fi
+      else
+        results=$(echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sort -uV)
+      fi
+
+    elif [[ $arg_match_on_common_name == 'yes' ]]; then
+      results=$(echo "$result" | jq -r '.[] | {output: (.name_value)} | .output')
+
+    elif [[ $arg_match_on_dns_name == 'yes' ]]; then
+      if [[ $arg_out_append == 'yes' ]]; then
+        if [[ $arg_out_reversed_append == 'yes' ]]; then
+          results=$(echo "$result" | jq -r '.[] | {output: (.name_value + "," + .common_name)} | .output')
+        else
+          results=$(echo "$result" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output')
+        fi
+      else
+        results=$(echo "$result" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output' | tr ',' '\n')
+      fi
+
     elif [[ $arg_match_domain_by_org == 'yes' ]]; then
-      results=$(echo "$result" | jq '.[] | {output: (.common_name)} | .output' | sed 's/"//g')
+      if [[ $arg_out_append == 'yes' ]]; then
+        if [[ $arg_out_reversed_append == 'yes' ]]; then
+          results=$(echo "$result" | jq -r '.[] | {output: (.name_value + "," + .common_name)} | .output')
+        else
+          results=$(echo "$result" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output')
+        fi
+      else
+        results=$(echo "$result" | jq -r '.[] | {output: (.common_name)} | .output')
+      fi
+
     else
       results=$(echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sort -uV)
     fi
+
     if [[ $arg_out_strip_wildcard == 'yes' ]]; then
-      echo "$results" | sed 's/^\*\.//g' | sort -uV
+      echo "$results" | sed 's/\*\.//g' | sort -uV
     else
       echo "$results" | sort -uV
     fi
