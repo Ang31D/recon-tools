@@ -16,6 +16,7 @@ arg_match_on_any_domain_tld=$(echo 'no')
 arg_match_on_common_name=$(echo 'no')
 arg_match_on_dns_name=$(echo 'no')
 arg_match_domain_by_org=$(echo 'no')
+arg_match_on_identity=$(echo 'no')
 arg_out_append=$(echo 'no')
 arg_out_reversed_append=$(echo 'no')
 arg_out_strip_wildcard=$(echo 'no')
@@ -35,8 +36,10 @@ validx=$((argidx+1)) # index of next arg-value
     arg_match_on_common_name=$(echo 'yes')
   elif [[ '--dns' == "${arg}" ]]; then
     arg_match_on_dns_name=$(echo 'yes')
-  elif [[ '-o' == "${arg}" || '--org' == "${arg}" ]]; then
+  elif [[ '--org' == "${arg}" ]]; then
     arg_match_domain_by_org=$(echo 'yes')
+  elif [[ '--identity' == "${arg}" ]]; then
+    arg_match_on_identity=$(echo 'yes')
   elif [[ '-a' == "${arg}" || '--append' == "${arg}" ]]; then
     arg_out_append=$(echo 'yes')
   elif [[ '-A' == "${arg}" || '--rev-append' == "${arg}" ]]; then
@@ -67,6 +70,7 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo '  --cn                    match on common name (Subject commonName)'
   echo '  --dns                   match on dns (Subject Alternative Name)'
   echo '  --org                   match on company (Subject organizationName)'
+  echo "  --identity              match on identity (matching on 'Full Text Search'"
   echo ''
   echo "  output:"
   echo '    default output domains if omitting: -p, -r or -s'
@@ -90,6 +94,7 @@ if [ -p /dev/stdin ]; then
 else
   data=$(echo "$1") # from argument input
 fi
+
 
 if [[ $arg_match_domain_by_org == 'yes' && $arg_parse_raw_json == 'no' ]]; then
   # url encode our input data - 
@@ -152,6 +157,8 @@ for query_value in $data; do
     result=$(curl -A Chrome -s https://crt.sh/\?dNSName\=$query_value\&output\=json)
   elif [[ $arg_match_domain_by_org == 'yes' ]]; then
     result=$(curl -A Chrome -s https://crt.sh/\?o\=\%.$query_value\&output\=json)
+  elif [[ $arg_match_on_identity == 'yes' ]]; then
+    result=$(curl -A Chrome -s https://crt.sh/\?Identity\=$query_value\&match\=FTS\&output\=json)
   else
     result=$(curl -A Chrome -s https://crt.sh/\?q\=\%.$query_value\&output\=json)
   fi
@@ -172,7 +179,7 @@ for query_value in $data; do
           results=$(echo "$result" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output')
         fi
       else
-        results=$(echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sort -uV)
+        results=$(echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n')
       fi
 
     elif [[ $arg_match_on_common_name == 'yes' ]]; then
@@ -200,8 +207,19 @@ for query_value in $data; do
         results=$(echo "$result" | jq -r '.[] | {output: (.common_name)} | .output')
       fi
 
+    #elif [[ $arg_match_on_dns_name == 'yes' ]]; then
+    #  results=$(echo "$result" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output' | tr ',' '\n')
+
     else
-      results=$(echo "$result" | jq -r '.? | .[] | "\(.name_value) \(.common_name)"' | tr ' ' '\n' | sort -uV)
+      if [[ $arg_out_append == 'yes' ]]; then
+        if [[ $arg_out_reversed_append == 'yes' ]]; then
+          results=$(echo "$result" | jq -r '.[] | {output: (.name_value + "," + .common_name)} | .output')
+        else
+          results=$(echo "$result" | jq -r '.[] | {output: (.common_name + "," + .name_value)} | .output')
+        fi
+      else
+        results=$(echo "$result" | jq -r '.[] | {output: (.name_value)} | .output')
+      fi
     fi
 
     if [[ $arg_out_strip_wildcard == 'yes' ]]; then
