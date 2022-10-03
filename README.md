@@ -18,6 +18,7 @@ Usage: 'crtsh (<domain>|<company>) [options]'
   --cn                    match on common name (Subject commonName)
   --dns                   match on dns (Subject Alternative Name)
   --org                   match on company (Subject organizationName)
+  --identity              match on identity (matching on 'Full Text Search'
 
   output:
     default output domains if omitting: -p, -r or -s
