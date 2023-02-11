@@ -64,7 +64,7 @@ if [[ $arg_show_help == 'yes' ]]; then
   echo "stdin/out support for workflow integration"
   echo "Usage: 'crtsh (<domain>|<company>) [options]'"
   echo "  query:"
-  echo '    default query sub-domains if omitting: -tld, -cn, --dns or --org'
+  echo '    default query sub-domains if omitting: --tld, --cn, --dns or --org'
   echo "  --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')"
   echo "                          hint: useful when finding root or 3rd-party domains"
   echo '  --cn                    match on common name (Subject commonName)'
