@@ -5,7 +5,7 @@
 
 # display short help
 if [[ $# == 0  && ! -p /dev/stdin ]]; then
-  echo "crtsh - utility to search for domain(s) at crt.sh (presorted DNS names)"
+  echo "crtsh - utility to search for domain(s) through crt.sh (presorted DNS names)"
   echo "stdin/out support for workflow integration"
   echo "Usage: 'crtsh (<domain>|<companyname>) [options] -h, --help'"
   exit
@@ -60,7 +60,7 @@ done
 
 # display full help
 if [[ $arg_show_help == 'yes' ]]; then
-  echo "crtsh - utility to search for domain(s) at crt.sh (presorted DNS names)"
+  echo "crtsh - utility to search for domain(s) through crt.sh (presorted DNS names)"
   echo "stdin/out support for workflow integration"
   echo "Usage: 'crtsh (<domain>|<company>) [options]'"
   echo "  query:"
