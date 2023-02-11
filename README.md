@@ -9,10 +9,11 @@ All tools should also support stdin/out for workflow integration.
 
 ### crtsh - A utility for quickly searching presorted DNS names.
 ```
+crtsh - utility to search for domain(s) through crt.sh (presorted DNS names)
 stdin/out support for workflow integration
 Usage: 'crtsh (<domain>|<company>) [options]'
   query:
-    default query sub-domains if omitting: -tld, -cn, --dns or --org
+    default query sub-domains if omitting: --tld, --cn, --dns or --org
   --tld                   matching on any tld ('<domain-name>.*' instead of '*.<domain>')
                           hint: useful when finding root or 3rd-party domains
   --cn                    match on common name (Subject commonName)
