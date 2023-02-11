@@ -7,7 +7,7 @@ All tools should also support stdin/out for workflow integration.
 
 ## example usage
 
-### crtsh - A utility for quickly searching presorted DNS names.
+### crtsh - crtsh - utility to search for domain(s) through crt.sh (presorted DNS names)
 ```
 crtsh - utility to search for domain(s) through crt.sh (presorted DNS names)
 stdin/out support for workflow integration
