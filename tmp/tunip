@@ -1,0 +1,9 @@
+#!/bin/bash
+
+tunid="0"
+
+if [[ $# -eq 1 ]]; then
+  tunid="$1"
+fi
+
+ifconfig "tun${tunid}" | grep "inet " | sed 's/.*inet //g' | sed 's/ .*//g'
